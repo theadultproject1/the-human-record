@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:humanrecord:schema:entry:v1",
+  "title": "Registry entry (schema v1)",
+  "description": "The permanent record of one human in the Registry. Append-only in spirit: fields are added by events, never removed. Lives at registry/{registry_id}/entry.json.",
+  "type": "object",
+  "required": ["schema", "registry_id", "enrolled_at", "verification", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "entry.v1" },
+    "registry_id": {
+      "type": "string",
+      "pattern": "^[0-9]{9}$",
+      "description": "Nine digits, zero-padded. Assigned once, never reused. #000000001 is reserved forever; public numbering begins at #000000002."
+    },
+    "enrolled_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC, ISO 8601."
+    },
+    "verification": {
+      "type": "object",
+      "required": ["tier", "era"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "0 email, 1 phone, 2 vouched, 3 documented."
+        },
+        "era": {
+          "type": "string",
+          "description": "Human-readable statement of the verification standard of the era, e.g. 'founding era — verified email'. Every record displays the standard under which it was admitted."
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "memorialized"],
+      "description": "Memorialization is a status of a record, not the purpose of the archive."
+    },
+    "chosen_name": {
+      "type": "string",
+      "maxLength": 400,
+      "description": "Optional; may be a pseudonym. Anonymity is a first-class mode."
+    },
+    "birth_era": {
+      "type": "string",
+      "description": "Coarse, optional, offered by the human (e.g. a decade: '1990s')."
+    },
+    "birth_place": {
+      "type": "string",
+      "description": "Coarse, optional, offered by the human."
+    },
+    "memorialized_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Present only when status is 'memorialized'."
+    },
+    "annotations": {
+      "type": "array",
+      "description": "Dated, sourced annotations added by STATUS_ANNOTATED events. Never alter testimony; they sit beside it.",
+      "items": {
+        "type": "object",
+        "required": ["at", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "text": { "type": "string" }
+        }
+      }
+    }
+  }
+}

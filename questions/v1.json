@@ -1,0 +1,87 @@
+{
+  "questionnaire_version": 1,
+  "ratified": "2026-07-05",
+  "answer_char_cap": 400,
+  "notes": "Stable question IDs never change even if wording is later refined. Human-readable form with rationale: questions/v1.md. All answers optional except q_name. Any answer may carry visibility 'sealed_until_death'.",
+  "testimony_order": {
+    "first": ["q_name", "q_place", "q_smile", "q_happiest", "q_hardest", "q_lesson", "q_regret", "q_future", "q_hope", "q_letter"],
+    "second": ["q_name", "q_place", "q_smile", "q_happiest", "q_hardest", "q_lesson", "q_regret", "q_future", "q_hope", "q_reflect_second", "q_letter"],
+    "final": ["q_name", "q_place", "q_smile", "q_happiest", "q_hardest", "q_lesson", "q_regret", "q_future", "q_hope", "q_reflect_final", "q_letter"]
+  },
+  "questions": [
+    {
+      "id": "q_name",
+      "prompt": "My name is…",
+      "note": "or the name I choose to be known by",
+      "required": true,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_place",
+      "prompt": "I am living, as of this testimony, in…",
+      "note": "as specific or as coarse as I wish — a city, a country, a region, or simply \"on Earth\"",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_smile",
+      "prompt": "What makes me smile is…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_happiest",
+      "prompt": "The happiest moment of my life so far was…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_hardest",
+      "prompt": "The hardest thing I have carried is…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_lesson",
+      "prompt": "The biggest lesson life has taught me is…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_regret",
+      "prompt": "The one thing I regret is…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_future",
+      "prompt": "I am excited about the future because…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_hope",
+      "prompt": "What I hope for the people who come after me is…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    },
+    {
+      "id": "q_reflect_second",
+      "prompt": "Looking back at my First Testimony, what has changed most in me is…",
+      "required": false,
+      "asked_in": ["second"]
+    },
+    {
+      "id": "q_reflect_final",
+      "prompt": "Looking back at my earlier testimonies, what I understand now that I could not have understood before is…",
+      "required": false,
+      "asked_in": ["final"]
+    },
+    {
+      "id": "q_letter",
+      "prompt": "If you have found this record, I want you to know…",
+      "required": false,
+      "asked_in": ["first", "second", "final"]
+    }
+  ]
+}

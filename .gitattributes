@@ -1,0 +1,8 @@
+# The archive is byte-anchored: the genesis event and every checkpoint
+# hash exact file bytes. Git must therefore NEVER translate line
+# endings - not on checkout, not on commit, not on any machine, in any
+# decade. Without this, a clone on a Windows machine (autocrlf=true is
+# the installer default) checks out CRLF bytes and verify.py correctly
+# reports every anchored founding document as altered. Discovered by
+# the first drill clone, 2026-07-13.
+* -text

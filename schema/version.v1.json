@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:humanrecord:schema:version:v1",
+  "title": "Testimony version (schema v1)",
+  "description": "One testimony sitting. Immutable once entered; may be withdrawn (answers removed, tombstone kept). At most three per human, ever (Constitution, Article IV). Lives at registry/{registry_id}/versions/{1|2|3}.json.",
+  "type": "object",
+  "required": ["schema", "registry_id", "version", "kind", "questionnaire_version", "entered_at", "status", "content_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "version.v1" },
+    "registry_id": { "type": "string", "pattern": "^[0-9]{9}$" },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3,
+      "description": "1, 2, or 3. A withdrawn version's slot stays spent."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["first", "second", "final"],
+      "description": "First, Second, or Final Testimony."
+    },
+    "questionnaire_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Which questions/vN.json these answers respond to."
+    },
+    "entered_at": { "type": "string", "format": "date-time" },
+    "status": { "type": "string", "enum": ["entered", "withdrawn"] },
+    "withdrawn_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Present only when status is 'withdrawn'."
+    },
+    "answers": {
+      "type": "object",
+      "description": "Keyed by stable question id. Absent entirely when withdrawn — the words are genuinely gone from every copy.",
+      "propertyNames": { "pattern": "^q_[a-z_]+$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["text", "visibility"],
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "description": "Capped at 400 characters (POLICY.md; testimonies are written to the cap of their era)."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": ["public", "sealed_until_death"],
+            "description": "Sealed answers enter the public record only on verified memorialization."
+          }
+        }
+      }
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the canonical JSON of the original answers object (see schema/CANONICAL.md). Survives withdrawal."
+    },
+    "signature": {
+      "type": "string",
+      "description": "Optional in the founding era; reserved for when institution keys exist."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "entered" } } },
+      "then": { "required": ["answers"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "withdrawn" } } },
+      "then": { "required": ["withdrawn_at"], "not": { "required": ["answers"] } }
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# The sites are generated views, never part of the record.
+site/
+info-site/
+
+# THE REGISTRY IS NEVER COMMITTED (ratified 2026-07-06).
+# This repository is the public transparency instrument: code,
+# Constitution, schemas, event log, verification tools. Testimony
+# text is browsable on the official website only; complete archive
+# snapshots go solely to trusted preservation partners under formal
+# agreements. The log proves the testimonies; it never contains them.
+registry/*
+!registry/README.md
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+~$*
+__pycache__/
+*.pyc
+
+# Pending submissions awaiting review are operational scratch space —
+# never part of the archive (POLICY.md, crisis-response protocol).
+# Only the folder's README is tracked so the desk exists on clone.
+inbox/*
+!inbox/README.md
+
+# wrangler's local cache — deployment plumbing, never part of the record
+.wrangler/
+
+# Local Worker secrets for `wrangler pages dev` (the ceremony HMAC secret
+# and any tuned gate limits). The real secret lives in Cloudflare's secret
+# store, never in the repo. This file is for local testing only.
+.dev.vars
+
+# Custody fallback (schema/ANCHORS.md): the uniqueness ledger, pepper,
+# agreements, and vouch edges live OUTSIDE the repo (AH_CUSTODY_DIR).
+# This in-repo fallback exists for drills only and is never committed.
+custody/
+
+# The drill (tools/make_drill.py): a disposable rehearsal CLONE living
+# beside this repo, never inside it. The marker file is what a drill
+# clone is stamped with; neither may ever be committed.
+drill-scratch/
+DRILL_CLONE

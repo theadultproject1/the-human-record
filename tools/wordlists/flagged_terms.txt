@@ -1,0 +1,22 @@
+# flagged_terms.txt — operator-maintained advisory wordlist for tools/botscreen.py
+#
+# One term per line. Lines starting with '#' and blank lines are ignored.
+# Matching is case-insensitive and word-boundary based.
+#
+# PURPOSE: surface possible slurs / hateful terms for a HUMAN to read in
+# context. This list NEVER auto-rejects anything. A term here may appear in
+# a testimony legitimately — quoted, reclaimed, or as the very harm the
+# author is describing. The reviewer decides; the tool only points.
+#
+# Keep this list curated and minimal. Add terms your review has shown you
+# need; remove any that cause more noise than signal. Coverage is
+# English-leaning by default — extend for the languages you receive.
+#
+# --- seed (unambiguous slurs; expand as needed) ---
+nigger
+faggot
+kike
+chink
+spic
+tranny
+retard

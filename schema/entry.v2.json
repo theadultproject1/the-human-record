@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://allhumans.world/schema/entry.v2.json",
+  "title": "Registry entry (schema v2)",
+  "description": "Supersedes entry.v1 for new enrollments (v1 records remain valid forever). Adds 'continuity': the hash of the human's continuity key, shown once at enrollment and never stored. Possession of the key is what entitles a human to enter their Second and Final Testimonies and to request withdrawal — like a wallet seed, keeping it safe is the owner's responsibility.",
+  "type": "object",
+  "required": ["schema", "registry_id", "enrolled_at", "verification", "status", "continuity"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "entry.v2" },
+    "registry_id": {
+      "type": "string",
+      "pattern": "^[0-9]{9}$",
+      "description": "Nine digits, zero-padded. Assigned once, never reused. #000000001 is reserved forever; public numbering begins at #000000002."
+    },
+    "enrolled_at": { "type": "string", "format": "date-time" },
+    "verification": {
+      "type": "object",
+      "required": ["tier", "era"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "era": { "type": "string" }
+      }
+    },
+    "status": { "type": "string", "enum": ["active", "memorialized"] },
+    "continuity": {
+      "type": "object",
+      "required": ["method", "key_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "const": "sha256-preimage",
+          "description": "The archive stores only SHA-256(key). Returning with the key proves continuity of the same human without the archive ever holding a secret."
+        },
+        "key_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "legacy": {
+      "type": "object",
+      "required": ["method", "iterations", "salt", "fingerprint"],
+      "additionalProperties": false,
+      "description": "The Legacy Key (added 2026-07-11): six plain words generated in the author's browser when they sealed answers, given by the author to someone they trust, and held by the archive ONLY as this stretched fingerprint — never published anywhere. Presenting the words with an attestation of death memorializes the record and opens its seals (POLICY.md, The seal). Salt 'continuity' means the PBKDF2 salt is the record's continuity key_hash (as an ASCII hex string).",
+      "properties": {
+        "method": { "const": "pbkdf2-sha256" },
+        "iterations": { "type": "integer", "minimum": 600000 },
+        "salt": { "const": "continuity" },
+        "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "wordlist": { "type": "string" },
+        "words": { "type": "integer", "minimum": 6 }
+      }
+    },
+    "recognition": {
+      "type": "object",
+      "description": "RESERVED (2026-07-09, unused): a future recognition mark, attachable to an existing record via a governance-adopted mechanism — never retroactively required. Reserved now so early records (which intentionally carry no mark) can attach one later without re-enrolling. See POLICY.md, Uniqueness."
+    },
+    "chosen_name": { "type": "string", "maxLength": 30 },
+    "birth_era": { "type": "string" },
+    "birth_place": { "type": "string" },
+    "memorialized_at": { "type": "string", "format": "date-time" },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["at", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "text": { "type": "string" }
+        }
+      }
+    }
+  }
+}

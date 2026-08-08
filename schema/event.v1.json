@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:humanrecord:schema:event:v1",
+  "title": "Registry log event (schema v1)",
+  "description": "One line of log/registry.log.jsonl — the append-only, hash-chained event log that is the institution's spine. Hashing rules: schema/CANONICAL.md.",
+  "type": "object",
+  "required": ["schema", "seq", "ts", "type", "data", "prev_hash", "hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "event.v1" },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0 for GENESIS, then strictly +1 per event."
+    },
+    "ts": { "type": "string", "format": "date-time" },
+    "type": {
+      "type": "string",
+      "enum": ["GENESIS", "ENROLLED", "VERSION_ENTERED", "VERSION_WITHDRAWN", "MEMORIALIZED", "VERIFICATION_CHANGED", "STATUS_ANNOTATED"]
+    },
+    "registry_id": {
+      "type": "string",
+      "pattern": "^[0-9]{9}$",
+      "description": "Required for every type except GENESIS."
+    },
+    "data": {
+      "type": "object",
+      "description": "Event payload. For VERSION_ENTERED: version, kind, content_hash. For ENROLLED: verification tier/era. For GENESIS: hashes of the founding documents."
+    },
+    "prev_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "hash of the previous event; 64 zeros for GENESIS."
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the canonical JSON of this event with the hash field absent."
+    },
+    "signature": {
+      "type": "string",
+      "description": "Optional in the founding era; reserved for institution keys."
+    }
+  },
+  "if": { "properties": { "type": { "const": "GENESIS" } } },
+  "then": {},
+  "else": { "required": ["registry_id"] }
+}

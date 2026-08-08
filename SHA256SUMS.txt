@@ -1,0 +1,2 @@
+0ef17f74f8fd0c5b1401882540a073328067564017e6e2edad900b6233663cd4  CONSTITUTION.md
+# CONSTITUTION.md is immutable (Article IX). MISSION.md and ARCHITECTURE.md are living documents and are not hashed.
