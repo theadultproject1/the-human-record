@@ -47,6 +47,7 @@ import ahlib
 import review          # reuse its analysis: render_answer + advisories
 import enroll
 import botscreen
+import pages           # the registry's standing decision lives here
 
 try:
     import winsound
@@ -199,10 +200,25 @@ def card(path):
         out.append('<span class="warn">⚠ unsafe filename — rename to letters, '
                    'digits, dot, dash, underscore before acting.</span>')
     else:
+        # A Tier 0 sitting fails validation by design — POLICY grants no
+        # number for a verified email alone — and the button used to
+        # vanish with it, leaving no way to reach the hand-vouch that
+        # POLICY does allow. At the founding EVERY arrival is Tier 0,
+        # because no number exists yet and so nobody can invite anyone,
+        # so hiding it hid the only door there is. If the tier is the
+        # ONLY complaint, offer the hand-vouch; any other problem still
+        # hides the button, because those are faults rather than a
+        # standard the founder can vouch past.
+        tier0_only = bool(problems) and all("Tier 0" in p for p in problems)
         if not problems:
             out.append(f'<form class=inline method=post action=/enroll>{tok()}'
                        f'<input type=hidden name=file value="{f}">'
                        f'<button class="act enroll">ENROLL — assign the number</button></form>')
+        elif tier0_only:
+            out.append(f'<form class=inline method=post action=/enroll>{tok()}'
+                       f'<input type=hidden name=file value="{f}">'
+                       f'<button class="act enroll">ENROLL ON MY HAND-VOUCH</button>'
+                       f'</form>')
         out.append(f'<form class=inline method=post action=/rewrite>{tok()}'
                    f'<input type=hidden name=file value="{f}">'
                    f'<button class="act rewrite">ASK FOR A REWRITE</button></form>')
@@ -246,13 +262,36 @@ def dashboard():
                         f'ceremony first, then <code>python tools/unseal.py …</code></p>')
         body.append('</div>')
 
+    # The door, and its switch. Shown before the ceremonies because it is
+    # the one piece of state a steward can get wrong without noticing:
+    # everything else announces itself, but a closed archive just looks
+    # like a quiet week.
+    is_open = registry_is_open()
+    body.append(
+        '<div class="cer"><h1>The registry</h1>'
+        + (f'<p>The archive is <strong>OPEN</strong>. Anyone of twenty or over '
+           f'can write a testimony right now.</p>'
+           if is_open else
+           f'<p class="warn">The archive is <strong>CLOSED</strong>. The consent '
+           f'page says the Record will soon open, and nobody can begin.</p>')
+        + f'<form class=inline method=post action=/registry>{tok()}'
+          f'<input type=hidden name=want value="{"closed" if is_open else "open"}">'
+          f'<button class="act">'
+          f'{"CLOSE the registry" if is_open else "OPEN the registry"}'
+          f'</button></form>'
+          '<p class="meta">Writes the decision to custody, rebuilds both sites '
+          'from it and deploys. The decision survives this terminal, so a later '
+          'rebuild that forgets a flag cannot quietly undo it.</p></div>')
+
     # the ceremony row
     body.append('<div class="cer"><h1>Ceremonies</h1>'
-                '<p class="meta">Run after enrolling: verify, rebuild the site, '
-                'deploy, checkpoint, then commit &amp; push (the commit is the act '
-                'of record).</p>')
+                '<p class="meta">Run after enrolling, left to right: verify, '
+                'rebuild the site, deploy, checkpoint, then commit &amp; push '
+                '(the commit is the act of record). Checkpoint sits just before '
+                'the push so the frozen tip rides in the same commit as the log '
+                'it freezes, and Bitcoin stamps both at once.</p>')
     for label, step in [("Verify", "verify"), ("Rebuild site", "build"),
-                        ("Checkpoint", "checkpoint"), ("Deploy", "deploy"),
+                        ("Deploy", "deploy"), ("Checkpoint", "checkpoint"),
                         ("Commit &amp; push", "push")]:
         body.append(f'<form class=inline method=post action=/ceremony>{tok()}'
                     f'<input type=hidden name=step value="{step.replace("&amp;","")}">'
@@ -294,17 +333,51 @@ def do_enroll(fields):
             else:
                 args += ["--ignore-envelope-vouch"]
                 note = "<p class='warn'>The envelope carries an UNVERIFIED vouch claim; it will be ignored (no edge recorded). Confirm by hand if it is real.</p>"
+        # A Tier 0 sitting cannot be enrolled as it stands: POLICY grants
+        # no number for a verified email alone. The founder's hand-vouch
+        # is the path POLICY leaves open, and it is offered as its own
+        # button so that admitting someone on the founder's word is a
+        # separate, deliberate act rather than a side effect of review.
+        try:
+            tier = int(((json.loads(path.read_text(encoding="utf-8"))
+                         .get("verification") or {}).get("tier", 0)))
+        except Exception:
+            tier = 0
         cmd = "python " + " ".join(args)
+        fcmd = "python " + " ".join(args + ["--founder-vouch"])
         where = ("a REHEARSAL number in this drill" if MODE == "drill"
                  else "the next REAL registry number, spent forever")
-        extra = (f"{note}<p>Enrolling will spend {where} and show the continuity key "
-                 f"once. This runs:</p><pre class='out'>{esc(cmd)}</pre>"
-                 f"<form method=post action=/enroll>{tok()}"
-                 f"<input type=hidden name=file value=\"{esc(name)}\">"
-                 f"<input type=hidden name=confirm value=yes>"
-                 f"<button class='act enroll'>CONFIRM — enroll and assign the number</button></form> "
-                 f"<a class='back' href='/'>cancel</a>")
-        return page("Confirm enrollment", banner() + "<h1>Confirm enrollment</h1>" + extra)
+        extra = [note,
+                 f"<p>Enrolling will spend {where} and show the continuity key "
+                 f"once.</p>"]
+        if tier < 1:
+            extra.append(
+                "<p class='warn'>This sitting is <strong>Tier 0</strong> (verified "
+                "email). POLICY grants no number for that alone, so plain "
+                "enrolment will refuse it.</p>"
+                "<p>You may admit it on your <strong>hand-vouch</strong>: your own "
+                "word that this is a living human of twenty or more, known to "
+                "you, holding no other record. The record will read "
+                "<em>“founding era — founder vouch”</em> forever, and no vouch "
+                "edge is recorded. This is not the same as having reviewed it; "
+                "every submission is reviewed.</p>"
+                f"<pre class='out'>{esc(fcmd)}</pre>"
+                f"<form method=post action=/enroll>{tok()}"
+                f"<input type=hidden name=file value=\"{esc(name)}\">"
+                f"<input type=hidden name=founder value=yes>"
+                f"<input type=hidden name=confirm value=yes>"
+                f"<button class='act enroll'>CONFIRM — enroll on my hand-vouch"
+                f"</button></form> <a class='back' href='/'>cancel</a>")
+        else:
+            extra.append(f"<p>This runs:</p><pre class='out'>{esc(cmd)}</pre>"
+                         f"<form method=post action=/enroll>{tok()}"
+                         f"<input type=hidden name=file value=\"{esc(name)}\">"
+                         f"<input type=hidden name=confirm value=yes>"
+                         f"<button class='act enroll'>CONFIRM — enroll and assign "
+                         f"the number</button></form> "
+                         f"<a class='back' href='/'>cancel</a>")
+        return page("Confirm enrollment",
+                    banner() + "<h1>Confirm enrollment</h1>" + "".join(extra))
     # step 2: do it
     env = enroll.read_envelope(path)
     vb = (env or {}).get("vouched_by")
@@ -314,6 +387,8 @@ def do_enroll(fields):
             args += ["--vouched-by", str(int(vb))]
         else:
             args += ["--ignore-envelope-vouch"]
+    if fields.get("founder") == "yes":
+        args.append("--founder-vouch")
     ok, out = run(args)
     if ok:
         # It is enrolled: take it out of the waiting queue, the same way
@@ -410,6 +485,64 @@ CEREMONIES = {
 }
 
 
+def registry_is_open():
+    """The standing decision, as pages.py reads it."""
+    try:
+        return pages.REGISTRY_OPEN
+    except Exception:
+        return False
+
+
+def do_registry(fields):
+    """Open or shut the archive: write the standing decision, rebuild both
+    sites from it, and deploy. One button for what used to be a shell
+    variable a rebuild could silently forget."""
+    want = fields.get("want", "")
+    if want not in ("open", "closed"):
+        return result("Registry", "unknown state requested", ok=False)
+    if fields.get("confirm") != "yes":
+        now = "OPEN" if registry_is_open() else "CLOSED"
+        what = ("**OPEN** the archive: the consent page will invite anyone "
+                "of twenty or over to write a testimony."
+                if want == "open" else
+                "**CLOSE** the archive: the consent page will say the Record "
+                "will soon open, and nobody will be able to begin.")
+        extra = (f"<p>The registry is currently <strong>{now}</strong>. This will "
+                 f"{esc(what)}</p>"
+                 f"<p class='meta'>It writes the decision to custody, rebuilds "
+                 f"both sites from it, and deploys. The decision outlives this "
+                 f"terminal: a later rebuild that forgets a flag can no longer "
+                 f"undo it.</p>"
+                 f"<form method=post action=/registry>{tok()}"
+                 f"<input type=hidden name=want value=\"{esc(want)}\">"
+                 f"<input type=hidden name=confirm value=yes>"
+                 f"<button class='act enroll'>CONFIRM — "
+                 f"{'open' if want == 'open' else 'close'} the registry</button>"
+                 f"</form> <a class='back' href='/'>cancel</a>")
+        return page("Confirm", banner() + "<h1>The registry</h1>" + extra)
+
+    try:
+        state = pages.registry_state_file()
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text("open" if want == "open" else "closed", encoding="utf-8")
+    except Exception as exc:                       # noqa: BLE001
+        return result("Registry", f"could not write the decision: {exc}", ok=False)
+
+    out = [f"decision written: {want}"]
+    for cmd in (CEREMONIES["build"] + CEREMONIES["deploy"]):
+        ok, text = run(cmd)
+        out.append(text)
+        if not ok:
+            return result("Registry — STOPPED", "\n".join(out), ok=False,
+                          extra="<p class='warn'>The decision is written but the "
+                                "sites were not fully rebuilt or deployed. The "
+                                "live archive may not match it yet. Fix the error "
+                                "and run Rebuild, then Deploy.</p>")
+    return result(f"The registry is now {want.upper()}", "\n".join(out), ok=True,
+                  extra="<p class='meta'>Live now. The build printed the state as "
+                        "its last line; read it in the output above.</p>")
+
+
 def do_ceremony(fields):
     step = fields.get("step", "")
     if step == "push":
@@ -452,11 +585,19 @@ def do_ceremony(fields):
         ok, o = run(args)
         allok = allok and ok
         out += "$ " + " ".join(a for a in args if not a.endswith("npx.cmd")) + "\n" + o + "\n"
+    # The moment a record is live is the moment its letter becomes true.
+    # send_letters checks the page answers before writing to anyone, so a
+    # half-finished deploy sends nothing and simply waits.
+    if step == "deploy" and allok:
+        ok, o = run([PY, "tools/send_letters.py", "--send"])
+        out += "$ python tools/send_letters.py --send\n" + o + "\n"
+        allok = allok and ok
     return result(step.title(), out, ok=allok)
 
 
 ROUTES = {"/enroll": do_enroll, "/refuse": do_refuse, "/hold": do_hold,
-          "/rewrite": do_rewrite, "/ceremony": do_ceremony}
+          "/rewrite": do_rewrite, "/ceremony": do_ceremony,
+          "/registry": do_registry}
 
 
 # ------------------------------------------------------------------- server
@@ -556,7 +697,34 @@ def watch(interval=600):
         time.sleep(interval)
 
 
+def require_custody():
+    """Refuse to run pointed at nothing.
+
+    Without AH_CUSTODY_DIR every tool silently falls back to an empty
+    in-repo custody/ folder. The Desk then reports the registry CLOSED
+    while the live archive is open, and every enrollment is refused for
+    a missing pepper that is actually sitting safely on disk. Two
+    frightening symptoms, one unset variable — so it is named here
+    rather than diagnosed again later.
+    """
+    if os.environ.get("AH_CUSTODY_DIR", "").strip():
+        return
+    guess = ahlib.ROOT.parent / "allhumans-custody"
+    print("[desk] REFUSED: AH_CUSTODY_DIR is not set.")
+    print("[desk] Without it the tools read an empty custody folder inside the")
+    print("[desk] repository: the anchor ledger looks out of service, no")
+    print("[desk] enrollment can proceed, and the registry's state cannot be")
+    print("[desk] read — so this page would tell you it is closed when it is not.")
+    if (guess / "pepper-v1.txt").exists():
+        print(f"[desk] The real custody appears to be: {guess}")
+    print("[desk] Set it for good (PowerShell, then open a NEW terminal):")
+    print("[desk]   [System.Environment]::SetEnvironmentVariable("
+          "'AH_CUSTODY_DIR','<path>','User')")
+    sys.exit(2)
+
+
 def main():
+    require_custody()
     if "--watch" in sys.argv:
         try: watch()
         except KeyboardInterrupt: print("\n[desk] stopped.")
@@ -565,6 +733,18 @@ def main():
     for a in sys.argv[1:]:
         if a.startswith("--port="):
             port = int(a.split("=", 1)[1])
+
+    # Pull what is waiting before opening the desk, so the page you land
+    # on is the truth. Reading a desk that quietly omits four testimonies
+    # because a separate command was not run first is worse than waiting
+    # a few seconds. --no-fetch skips it when offline or in a hurry.
+    if "--no-fetch" not in sys.argv and all(
+            os.environ.get(k) for k in ("CF_ACCOUNT_ID", "CF_API_TOKEN")):
+        print("[desk] fetching what is waiting…")
+        ok, out = run([PY, "tools/fetch_inbox.py"])
+        tail = [l for l in (out or "").splitlines() if l.strip()][-1:] or ["(nothing new)"]
+        print(f"[desk] {tail[0]}" if ok else
+              f"[desk] fetch failed, opening anyway — the desk may be incomplete:\n{out}")
     server = ThreadingHTTPServer((HOST, port), Handler)
     url = f"http://{HOST}:{server.server_port}/"
     print(f"[desk] {MODE.upper()} — serving the Desk at {url}")

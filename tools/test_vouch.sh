@@ -203,6 +203,53 @@ else
 fi
 rm -rf "$SB"
 
+echo "11) the founder's hand-vouch — a Tier 0 sitting, admitted on the founder's word"
+# POLICY, Verification: "the founder's hand-vouch remains available where
+# no invitation exists". Everyone arriving before the first enrollment is
+# Tier 0, because nobody holds a number and so nobody can invite. This is
+# the only door open at the founding, and it spends real numbers, so it
+# is tested: refused without the flag, admitted with it, recorded
+# honestly, and never confused with a peer edge.
+FB="$(mktemp -d "${TMPDIR:-/tmp}/ah_vouch_founder.XXXXXX")"
+cp -r "$ROOT/." "$FB/" 2>/dev/null
+rm -rf "$FB/.git" "$FB/.wrangler"
+(
+  cd "$FB"
+  find registry -mindepth 1 -maxdepth 1 -type d -name '[0-9]*' -exec rm -rf {} + 2>/dev/null
+  head -n 1 log/registry.log.jsonl > log/registry.log.jsonl.tmp && mv log/registry.log.jsonl.tmp log/registry.log.jsonl
+  rm -rf checkpoints custody
+  export AH_CUSTODY_DIR="$FB/custody-test"
+  unset AH_ANCHOR_PEPPER_FILE 2>/dev/null || true
+  "$PY" tools/anchors.py init >/dev/null 2>&1
+  cat > tier0.json <<'JSON'
+{ "chosen_name": "Tier Zero Human",
+  "verification": {"tier": 0, "era": "founding era, verified email"},
+  "answers": {
+    "q_name":  {"text": "Tier Zero Human", "visibility": "public"},
+    "q_place": {"text": "Paris", "visibility": "public"},
+    "q_smile": {"text": "The smell of bread before the shops open.", "visibility": "public"},
+    "q_hope":  {"text": "That they read this and feel less alone.", "visibility": "public"} } }
+JSON
+  echo "--- plain enroll (must refuse) ---"
+  "$PY" tools/enroll.py tier0.json --email t0@example.org 2>&1
+  echo "--- both vouch kinds at once (must refuse) ---"
+  "$PY" tools/enroll.py tier0.json --email t0@example.org --founder-vouch --vouched-by 2 2>&1
+  echo "--- founder hand-vouch (must enroll) ---"
+  "$PY" tools/enroll.py tier0.json --email t0@example.org --founder-vouch 2>&1
+  echo "--- what the record says ---"
+  cat registry/000000002/entry.json 2>/dev/null
+) > "$FB/founder.out" 2>&1
+if grep -q "Tier 0 (verified email) grants no number" "$FB/founder.out" \
+   && grep -q "founder-vouch and --vouched-by are different" "$FB/founder.out" \
+   && grep -qE "enrolled: (Registry )?#000000002" "$FB/founder.out" \
+   && grep -q "founder vouch" "$FB/founder.out" \
+   && ! grep -q "vouch edge recorded" "$FB/founder.out"; then
+  ok "Tier 0 refused plainly, admitted on the hand-vouch, recorded as such, no edge"
+else
+  bad "founder hand-vouch wrong:"; sed 's/^/    /' "$FB/founder.out" | tail -14
+fi
+rm -rf "$FB"
+
 echo
 echo "vouch: $PASS passed, $FAIL failed"
 rm -rf "$ROOT/custody-test-vouch" 2>/dev/null

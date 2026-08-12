@@ -138,6 +138,53 @@ def file_sha256(path: Path) -> str:
     return sha256_hex(path.read_bytes())
 
 
+# --- The syntax gate ----------------------------------------------------
+# Every page's behaviour lives in ONE inline <script>. A single typo in it
+# is not a small bug: the browser refuses the whole script, so the counter
+# never counts, the ceremony token is never fetched, and COMPLETE MY
+# TESTIMONY stays greyed out forever with nothing on the page to say why.
+# That shipped once, on 2026-08-10, from a missing "+" between two string
+# literals, and a person who had written their whole testimony could not
+# send it. Nothing in the build noticed, because a broken script is still
+# perfectly good HTML.
+#
+# So every page is parsed before it is written. Node is used only if it is
+# already here; the archive's tools stay standard-library only and must run
+# on a machine that has never seen npm. Deploying needs node anyway (npx
+# wrangler), so on any machine that can ship, this gate runs.
+
+def js_syntax_errors(html_text: str, label: str) -> list:
+    """Parse every inline <script> in a page. Returns a list of complaints,
+    empty when the page is sound or when node is unavailable to ask."""
+    import re
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if not node:
+        return []
+    problems = []
+    scripts = re.findall(r"<script>(.*?)</script>", html_text, re.S)
+    for i, body in enumerate(scripts):
+        if not body.strip():
+            continue
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "s.js"
+            f.write_text(body, encoding="utf-8")
+            r = subprocess.run([node, "--check", str(f)],
+                               capture_output=True, text=True)
+            if r.returncode != 0:
+                detail = (r.stderr or "").strip().splitlines()
+                keep = [ln for ln in detail if "SyntaxError" in ln] or detail[:3]
+                problems.append(f"{label} script #{i + 1}: " + " / ".join(keep))
+    return problems
+
+
+def node_available() -> bool:
+    import shutil
+    return shutil.which("node") is not None
+
+
 # --- Continuity keys -------------------------------------------------
 # A continuity key is the human's proof of return: shown once at
 # enrollment, never stored — only its SHA-256 lives in entry.json.

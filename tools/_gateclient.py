@@ -57,7 +57,8 @@ def get_token():
     return json.loads(b)
 
 
-def body(token, nonce, affirmed=5, answers=2, website="", thin=False):
+def body(token, nonce, affirmed=5, answers=2, website="", thin=False,
+         shortplace=False):
     ans = {"q_name": {"text": "Test Human", "visibility": "public"}}
     pool = [("q_smile", "morning coffee and a quiet street at dawn"),
             ("q_hope", "that they are kinder than we managed to be"),
@@ -65,6 +66,11 @@ def body(token, nonce, affirmed=5, answers=2, website="", thin=False):
     for i in range(answers):
         k, t = pool[i]
         ans[k] = {"text": ("hi" if thin else t), "visibility": "public"}
+    if shortplace:
+        # "Paris" is a whole and truthful answer to where you live, and
+        # the substance floor used to refuse the entire testimony for it.
+        # Found by the founder walking his own site, 2026-08-01.
+        ans["q_place"] = {"text": "Paris", "visibility": "public"}
     return {
         "acceptance": {"email": "gate@test.dev", "affirmed": ["a"] * affirmed,
                        "accepted_at": "2026-07-09T00:00:00Z", "page": "enter-v1"},
@@ -113,6 +119,11 @@ def main():
     elif SCENARIO == "thin":
         t, nonce = gate_pass_token()
         s, b = req("/api/submit", "POST", body(t, nonce, answers=2, thin=True), IP)
+    elif SCENARIO == "shortplace":
+        # Two real answers plus a one-word place. Must be ACCEPTED.
+        t, nonce = gate_pass_token()
+        s, b = req("/api/submit", "POST",
+                   body(t, nonce, answers=2, shortplace=True), IP)
     elif SCENARIO == "accept":
         # a well-formed acceptance (front of the funnel, no token needed)
         s, b = req("/api/accept", "POST",

@@ -81,5 +81,13 @@ INFO_URL = "https://info." + DOMAIN
 # books anyone can read. AH_DONATE_URL overrides for rehearsals.
 # TODO(founder): create the collective and set the true slug here; until
 # then this link has no live destination.
-DONATE_URL = _env_override("AH_DONATE_URL",
-                           "https://opencollective.com/the-human-record")
+_DONATE_PLACEHOLDER = "https://opencollective.com/the-human-record"
+DONATE_URL = _env_override("AH_DONATE_URL", _DONATE_PLACEHOLDER)
+
+# True only once a real destination exists. The placeholder answers 404,
+# and a prominent button to nowhere is worse than no button at all -
+# especially at the end of the writing ceremony, where a person has just
+# left their life story and is feeling something. The sentence saying the
+# Record is donation-funded is always shown, because it is true; the
+# button appears when there is somewhere for it to go.
+DONATE_READY = DONATE_URL != _DONATE_PLACEHOLDER

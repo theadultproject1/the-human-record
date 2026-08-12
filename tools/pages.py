@@ -31,6 +31,7 @@ falls back to download-and-email so no testimony is ever lost.
 import html
 import json
 import os
+import sys
 from pathlib import Path
 
 import brand  # public display name + domain (the one place they live)
@@ -57,18 +58,41 @@ LEGACY_PBKDF2_ITERS = 600000   # key-stretching: each guess costs 600k hashes
 # opening the real registry is the deliberate act of exporting
 # AH_REGISTRY_OPEN=true for the production build. Anything except
 # 'true'/'false' stops the build.
+def registry_state_file():
+    """Where the operator's standing decision is kept: in custody, never
+    in the repository, because it is this machine's operating stance and
+    not part of the record. A clone that has no custody has no stance and
+    therefore stays shut."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import anchors
+    return anchors.custody_dir(create=False) / "registry-open"
+
+
 def _registry_open() -> bool:
+    # The environment still wins, because a drill must be able to force
+    # its own answer without touching anything the operator relies on.
     raw = os.environ.get("AH_REGISTRY_OPEN")
-    if raw is None:
-        return False
-    v = raw.strip().lower()
-    if v == "true":
-        return True
-    if v == "false":
-        return False
-    raise SystemExit(
-        f"AH_REGISTRY_OPEN={raw!r} is neither 'true' nor 'false'. "
-        "A misspelled value stops the build; it never guesses.")
+    if raw is not None:
+        v = raw.strip().lower()
+        if v == "true":
+            return True
+        if v == "false":
+            return False
+        raise SystemExit(
+            f"AH_REGISTRY_OPEN={raw!r} is neither 'true' nor 'false'. "
+            "A misspelled value stops the build; it never guesses.")
+    # Otherwise the standing decision, written by the Desk. Before this
+    # existed the state lived only in a shell variable, so any rebuild
+    # that forgot it closed the archive silently — which is exactly what
+    # happened on 2026-08-01, from running the test suites in the correct
+    # order. A decision this large should survive a forgotten flag.
+    try:
+        state = registry_state_file()
+        if state.exists():
+            return state.read_text(encoding="utf-8").strip().lower() == "open"
+    except Exception:
+        pass
+    return False        # no environment, no custody, no stance: shut
 
 
 REGISTRY_OPEN = _registry_open()
@@ -106,6 +130,9 @@ details.sect[open]{padding-bottom:.9em}
 .checks label{display:block;margin:.9em 0;cursor:pointer}
 .checks input{margin-right:.7em}
 .center{text-align:center;margin-top:2.5em}
+.gohome{margin-top:3.2em}
+.needed{background:#151313;border:1px solid #5a5240;color:#e0d9c6;padding:.65em .95em;border-radius:2px;margin:1.3em 0}
+.needed .plainnote{color:#b6ae9b}
 .agree{margin-top:.5em;font-size:.8em}
 .quiet{color:#8a8578;font-size:.85em}
 input[type=email]{width:100%;box-sizing:border-box;background:#0d0f14;border:1px solid #8a8264;color:#e8e3d6;font-family:inherit;font-size:1em;padding:.7em;border-radius:2px;box-shadow:0 0 14px 2px rgba(244,233,200,.28)}
@@ -346,8 +373,7 @@ principles (your email, your confirmations, and the time) is
 recorded as the agreement between you and __BRAND__.</p>
 
 __BEGIN_BLOCK__
-<p class="center quiet"><a href="privacy.html">Privacy Policy</a> ·
-<a href="index.html">return to the lights</a></p>
+<p class="center quiet"><a href="index.html">return to the lights</a></p>
 """
 
 CONSENT_JS = """
@@ -378,6 +404,14 @@ CONSENT_JS = """
       page: 'enter-v1'
     };
     try { sessionStorage.setItem('ah_acceptance', JSON.stringify(acceptance)); } catch(err) {}
+    // A fresh acceptance means a fresh sitting, so the previous
+    // ceremony's "finished" mark no longer applies. Without this the
+    // writing page greets the next person with "This page has closed"
+    // and offers them nothing: a family on one laptop, a library
+    // machine, or a phone handed over with "your turn" all hit a wall.
+    // The mark still does its real job, which is refusing to resurrect
+    // a ceremony whose keys were already shown and wiped.
+    try { sessionStorage.removeItem('ah_ceremony_done'); } catch(err) {}
     try {
       fetch('/api/accept', {method:'POST', keepalive:true,
         headers:{'content-type':'application/json'},
@@ -421,7 +455,10 @@ WRITE_JS_TEMPLATE = """
     return n;
   }
   function solvePow(seed, bits){
-    return new Promise(function(resolve){
+    return new Promise(function(resolve, reject){
+      if (!(window.crypto && crypto.subtle && crypto.subtle.digest)) {
+        return reject(new Error('no webcrypto'));
+      }
       var nonce = 0;
       function step(){
         (function loop(){
@@ -442,14 +479,49 @@ WRITE_JS_TEMPLATE = """
       step();
     });
   }
-  fetch('/api/ceremony').then(function(r){ return r.json(); }).then(function(t){
-    if (!t || !t.ok) { return; }   // gate down/offline -> submit falls back to email
-    ceremony = t; tokenReady = true;
-    var bits = t.pow_bits || 0;
-    if (bits > 0) { solvePow(t.seed, bits).then(function(n){ powNonce = n; powReady = true; updateFinish(); }); }
-    else { powReady = true; }
-    updateFinish();
-  }).catch(function(){ /* offline: the email fallback still works */ });
+  // The gate is fetched with retries, because one bad moment on the
+  // network used to cost the author their whole testimony: tokenReady
+  // stayed false forever, the button stayed disabled forever, and the
+  // email fallback that was supposed to catch exactly this sat behind
+  // the button that could not be pressed.
+  var gateFailed = false;
+  function openGate(attempt){
+    fetch('/api/ceremony', { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(function(t){
+        if (!t || !t.ok) throw new Error('gate closed');
+        ceremony = t; tokenReady = true;
+        var bits = t.pow_bits || 0;
+        if (bits > 0) {
+          solvePow(t.seed, bits).then(function(n){
+            powNonce = n; powReady = true; updateFinish();
+          }).catch(function(){ gateFailed = true; updateFinish(); });
+        } else { powReady = true; }
+        updateFinish();
+      })
+      .catch(function(){
+        if (attempt < 3) { setTimeout(function(){ openGate(attempt + 1); }, 1500 * attempt); }
+        else { gateFailed = true; updateFinish(); }
+      });
+  }
+  openGate(1);
+
+  // Wait for the gate at the moment of submission rather than gating the
+  // button on it. Resolves true when the ceremony is ready, false when it
+  // is not coming, so the caller can take the email path instead of
+  // leaving someone stranded with a button that never lights.
+  function gateReady(waitMs){
+    if (tokenReady && powReady) return Promise.resolve(true);
+    if (gateFailed) return Promise.resolve(false);
+    return new Promise(function(resolve){
+      var waited = 0;
+      (function poll(){
+        if (tokenReady && powReady) return resolve(true);
+        if (gateFailed || waited >= waitMs) return resolve(false);
+        waited += 250; setTimeout(poll, 250);
+      })();
+    });
+  }
 
   var areas = document.querySelectorAll('textarea');
   for (var i = 0; i < areas.length; i++) (function(ta){
@@ -461,11 +533,34 @@ WRITE_JS_TEMPLATE = """
     tick();
   })(areas[i]);
 
+  // The way out, guarded. Nothing on this page is saved anywhere until
+  // the final confirmation, so a stray click on "return to the lights"
+  // would silently destroy an hour of writing. Ask only if there is
+  // something to lose; an untouched page just lets you go.
+  var leave = document.getElementById('leave');
+  if (leave) leave.addEventListener('click', function(ev){
+    var written = false;
+    for (var i = 0; i < areas.length; i++){
+      if (areas[i].value.trim().length){ written = true; break; }
+    }
+    if (written && !window.confirm(
+        'Nothing you have written has been sent yet, and leaving this page '
+        + 'will lose it. Return to the lights?')) {
+      ev.preventDefault();
+    }
+  });
+
+  // Two questions are answered in a word and no more: a name, and where
+  // you live. "Paris" is a complete and truthful answer, and the floor
+  // used to reject it, which turned an honest reply into an error. They
+  // are exempt from the minimum and do not count toward the two, because
+  // the two are about testimony, not identity.
+  var SHORT_OK = { q_name: 1, q_place: 1 };
   // Substance floor: name + at least two answers, each a real few words.
   function answeredCount(){
     var n = 0;
     for (var i = 0; i < areas.length; i++){
-      if (areas[i].id === 'q_name') continue;
+      if (SHORT_OK[areas[i].id]) continue;
       if (areas[i].value.trim().length >= MIN_ANSWER) n++;
     }
     return n;
@@ -473,13 +568,30 @@ WRITE_JS_TEMPLATE = """
   function updateFinish(){
     var nameOK = document.getElementById('q_name').value.trim().length > 0;
     var enough = answeredCount() >= 2;
-    var ready = nameOK && enough && tokenReady && powReady;
-    finishBtn.disabled = !ready;
-    if (!nameOK) floorNote.textContent = 'Your name is the one answer always needed.';
+    // The button turns on what the AUTHOR controls and nothing else. It
+    // used to also wait on the anti-flood gate, so a failed token fetch
+    // or a browser without WebCrypto left a finished testimony behind a
+    // button that would never light, with no way to reach the email
+    // fallback built for exactly that. The gate is now waited for at the
+    // moment of submission, where it can be explained or routed around.
+    finishBtn.disabled = !(nameOK && enough);
+    // Always say where they stand, and count out loud. "Two answers: 1 of
+    // 2" tells someone what to do; a greyed button tells them nothing.
+    var n = answeredCount();
+    if (!nameOK) floorNote.textContent =
+      'Still needed: your name, and any two answers (' + n + ' of 2 so far).';
     else if (!enough) floorNote.textContent =
-      'Please answer at least two questions, a sentence or more each, so there is a testimony to keep. Every question is yours to choose or leave as silence.';
-    else if (!tokenReady || !powReady) floorNote.textContent = 'Preparing your ceremony…';
-    else floorNote.textContent = '';
+      'Still needed: ' + (2 - n) + (n === 1 ? ' more answer' : ' answers')
+      + ' of a few words (' + n + ' of 2 so far). Any questions you choose; '
+      + 'the rest are kept as silence.';
+    else if (gateFailed) floorNote.textContent =
+      'Ready. The ceremony gate did not answer, so completing will offer you '
+      + 'an email copy of your testimony; nothing you wrote is lost.';
+    else if (!tokenReady || !powReady) floorNote.textContent =
+      'Ready. Your testimony can be completed whenever you are (a moment of '
+      + 'preparation is still finishing in the background).';
+    else floorNote.textContent =
+      'Ready. Your testimony can be completed whenever you are.';
   }
 
   function makeKey(){
@@ -571,17 +683,31 @@ WRITE_JS_TEMPLATE = """
       var ta = areas[i];
       var text = ta.value.trim();
       if (!text) continue;
-      if (ta.id !== 'q_name' && text.length < MIN_ANSWER) return { error:
-        'Each answer you give should be at least ' + MIN_ANSWER + ' characters, a few words. '
-        + 'You are always free to leave a question blank; it is kept as silence.' };
+      if (!SHORT_OK[ta.id] && text.length < MIN_ANSWER) {
+        // Name the question and hand back the field itself, so the page
+        // can take the writer to it. Being told an answer is too short,
+        // with nine boxes on screen and no clue which one, is how a
+        // person gives up on a form.
+        var lbl = ta.previousElementSibling;
+        var which = (lbl && lbl.textContent ? '“' + lbl.textContent.trim() + '”' : 'One of your answers');
+        return { error: which + ' needs at least ' + MIN_ANSWER
+          + ' characters, a few words. You are always free to leave a question '
+          + 'blank instead; it is kept as silence.', focus: ta };
+      }
       var sealed = document.getElementById(ta.id + '_seal').checked;
       answers[ta.id] = { text: text, visibility: sealed ? 'sealed_until_death' : 'public' };
-      if (ta.id !== 'q_name') answered++;
+      if (!SHORT_OK[ta.id] && text.length >= MIN_ANSWER) answered++;
     }
     if (answered < 2) return { error:
       'Please answer at least two questions so there is a testimony to keep. Any two you choose.' };
+    // chosen_name is the PUBLIC display name. If the author sealed their
+    // name answer, they have asked for it not to be shown, so no public
+    // name leaves the browser at all: the sealed answer still travels and
+    // still opens one day, but nothing here can be printed on a heading
+    // by mistake. The seal is honoured before the words are even sent.
+    var nameSealed = document.getElementById('q_name_seal').checked;
     return { sitting: {
-      chosen_name: name,
+      chosen_name: nameSealed ? undefined : name,
       verification: { tier: 0, era: 'founding era, verified email' },
       answers: answers
     }};
@@ -712,7 +838,20 @@ WRITE_JS_TEMPLATE = """
     var errbox = document.getElementById('errors');
     errbox.textContent = '';
     var built = buildSitting();
-    if (built.error) { errbox.textContent = built.error; window.scrollTo(0,0); return; }
+    if (built.error) {
+      errbox.textContent = built.error;
+      // Go to the problem, not to the top of the page. Scrolling away
+      // from the field that needs fixing is the opposite of help.
+      if (built.focus) {
+        try {
+          built.focus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          built.focus.focus({ preventScroll: true });
+        } catch (e) { built.focus.focus(); }
+      } else {
+        window.scrollTo(0, 0);
+      }
+      return;
+    }
     var vcode = document.getElementById('vouch_code').value.trim().toLowerCase();
     if (vcode && !/^vh1-[0-9a-f]{4}(-[0-9a-f]{4}){2}$/.test(vcode)) {
       errbox.textContent = 'That invitation does not look right (vh1-xxxx-xxxx-xxxx). '
@@ -732,6 +871,26 @@ WRITE_JS_TEMPLATE = """
     }).then(function(go){
       if (!go) return;
     btn.disabled = true;
+    // Give the gate up to twenty seconds to finish what it started on
+    // load. On a slow phone the proof of work is simply still running;
+    // waiting here is honest, and refusing to submit is not.
+    var waiting = btn.textContent;
+    if (!(tokenReady && powReady)) btn.textContent = 'PREPARING YOUR CEREMONY…';
+    gateReady(20000).then(function(open){
+      btn.textContent = waiting;
+      if (!open) {
+        // The gate never came. The testimony is finished and must not be
+        // held hostage to it: hand over the email path with the words and
+        // the keys intact, exactly as a server outage is handled below.
+        var k = makeKey();
+        var lw = sealedCount() > 0 ? makeLegacyKey() : null;
+        btn.disabled = false;
+        showFallback(built.sitting, k, lw);
+        return;
+      }
+      submitNow();
+    });
+    function submitNow(){
     var key = makeKey();
     var legacyWords = sealedCount() > 0 ? makeLegacyKey() : null;
     sha256hex(key).then(function(keyHash){
@@ -782,6 +941,7 @@ WRITE_JS_TEMPLATE = """
       errbox.textContent = 'Your browser could not generate a secure key. Please try a current browser.';
       window.scrollTo(0,0);
     });
+    }
     });
   });
 })();
@@ -951,11 +1111,17 @@ export default {
     // author chooses; a given answer must be 10..400 chars (a thinner one
     // is a slip or a bot, and is not counted). The name is identity, not
     // testimony, so it never counts toward the two.
+    // A name and a place are answered in one word and are still complete
+    // answers. They are exempt from the floor and are not counted toward
+    // the two, exactly as the writing page has it: if these two rules
+    // ever disagree, a person is told their testimony is fine and then
+    // refused by the worker with no way to see why.
+    const SHORT_OK = { q_name: 1, q_place: 1 };
     const substanceOK = (s) => {
       const a = (s && s.answers) || {};
       let count = 0;
       for (const k in a) {
-        if (k === 'q_name') continue;
+        if (SHORT_OK[k]) continue;
         const t = ((a[k] && a[k].text) || '').trim();
         if (t.length === 0) continue;
         if (t.length < 10) return false;
@@ -1377,13 +1543,19 @@ def render_begin(qmeta):
                  'works after the <a href="enter.html">Before writing your testimony</a> page, '
                  'where the principles are accepted and your email is given. '
                  'Please start there.</p>')
-    parts.append('<p class="meta">Take your time. Every answer except your name is '
-                 'optional; an unanswered question is recorded as silence. A record '
-                 'keeps your name and at least two answers, any two you choose, '
-                 'each a few words (%d characters or more). Each answer may hold at '
-                 'most %d characters, the cap is the craft; your name holds at most '
-                 '%d. Nothing leaves this page until the final confirmation.</p>'
-                 % (ANSWER_MIN, cap, NAME_CAP))
+    # The requirement, on its own, in plain sight. It used to sit in the
+    # middle of a grey paragraph beside the character caps, so a person
+    # met a greyed-out button and had to hunt for the reason. What a form
+    # demands should be the easiest thing on it to find.
+    parts.append('<p class="needed">To complete a testimony you need '
+                 '<strong>your name and any two answers</strong>, each a few '
+                 'words (%d characters or more). Everything else is optional.</p>'
+                 % ANSWER_MIN)
+    parts.append('<p class="meta">Take your time. An unanswered question is '
+                 'recorded as silence. Each answer may hold at most %d '
+                 'characters, the cap is the craft; your name holds at most %d. '
+                 'Nothing leaves this page until the final confirmation.</p>'
+                 % (cap, NAME_CAP))
     parts.append('<p class="err" id="errors"></p>')
     # Honeypot: a field no human sees or fills. Off-screen, not hidden by
     # display:none (some bots skip those), aria-hidden and out of tab order.
@@ -1393,11 +1565,25 @@ def render_begin(qmeta):
                  '<label>Leave this field empty'
                  '<input type="text" id="website" name="website" tabindex="-1" '
                  'autocomplete="off" value=""></label></div>')
+    # The two identity questions are answered in a word and are exempt from
+    # the floor, so filling them moves no counter. Said here, beside the
+    # question itself, because a counter that ignores an answer you just
+    # typed reads as broken rather than as designed.
+    #
+    # These marks are the SITE's furniture and can be reworded freely. The
+    # prompts and notes beneath them cannot: questions/v1.json is hashed
+    # into the GENESIS event and stamped into Bitcoin, so changing a word
+    # of a question makes verify.py fail on the founding anchor.
+    NOT_COUNTED = {"q_name": "(required)",
+                   "q_place": "(optional but doesn't count as an answer)"}
     for qid in qmeta["testimony_order"]["first"]:
         q = qbyid[qid]
         qcap = NAME_CAP if qid == "q_name" else cap
         parts.append('<div class="q">')
-        parts.append('<p class="prompt">%s</p>' % html.escape(q["prompt"]))
+        mark = NOT_COUNTED.get(qid)
+        parts.append('<p class="prompt">%s%s</p>'
+                     % (html.escape(q["prompt"]),
+                        ' <span class="plainnote">%s</span>' % mark if mark else ''))
         if q.get("note"):
             parts.append('<p class="note">%s</p>' % html.escape(q["note"]))
         parts.append('<textarea id="%s" maxlength="%d"></textarea>' % (qid, qcap))
@@ -1410,15 +1596,23 @@ def render_begin(qmeta):
         parts.append('</div>')
     parts.append(
         '<div class="banner hidden" id="seal_explain">'
-        '<strong>What sealing means.</strong> A sealed answer is kept but '
-        'shown to no one. It opens when someone you trust brings your '
+        '<strong>What sealing means.</strong> A sealed answer is never shown '
+        'on any page, never published, and never included in anything the '
+        'archive distributes. It is hidden from the world, not from the '
+        'archive: the steward reads it once when your testimony is reviewed, '
+        'and it is kept in readable form afterwards. It has to be. The '
+        'promise below, that every seal opens after one hundred years, is '
+        'only keepable if the archive can still open it; words locked so '
+        'that no one but you could ever read them would simply be lost the '
+        'day your key was. <strong>If something must never be read by '
+        'anyone, do not write it here.</strong> It opens when someone you '
+        'trust brings your '
         '<strong>Legacy Key</strong>, six plain words you will receive '
         'after you finish, and reports your death. If the key is never '
         'used, every seal opens on its own one hundred years after '
         'enrollment.<br>'
         '<em>Some are opened by those we trust. '
         'The rest are opened by time itself.</em></div>')
-    parts.append('<p class="meta" id="floor_note"></p>')
     parts.append(
         '<div class="q" id="vouchq">'
         '<p class="prompt">MY INVITATION '
@@ -1429,17 +1623,36 @@ def render_begin(qmeta):
         '<input type="text" id="vouch_code" maxlength="18" '
         'placeholder="vh1-xxxx-xxxx-xxxx" autocomplete="off" spellcheck="false">'
         '</div>')
+    # Beside the button it governs, not paragraphs above it. A disabled
+    # button with its reason elsewhere is a locked door with the notice
+    # on another wall.
+    parts.append('<p class="needed" id="floor_note"></p>')
     parts.append('<p><button class="finish" id="finish" disabled>COMPLETE MY TESTIMONY</button></p>')
+    # Every other page offers a way back; this one held people until they
+    # finished or closed the tab. A door out is not an invitation to leave,
+    # it is what makes staying a choice. It asks first if anything has been
+    # written, because nothing here is saved until the final confirmation.
+    parts.append('<p class="center quiet"><a href="index.html" id="leave">'
+                 'return to the lights</a></p>')
     parts.append('</div>')
     parts.append(
         '<div id="received">'
         '<p class="pagetimer"></p>'
         '<h1>Your testimony has been received</h1>'
-        '<p>It will be read by a person, as every testimony is in this era. '
-        'If it is accepted, your number will be assigned in sequence, '
-        'your light will be added, and your number will be sent to '
+        # "If it is accepted" left the obvious question unanswered: accepted
+        # by whom, and against what? Read on this screen it sounds like a
+        # judgement of the life just written. Say what the reading is
+        # actually for, and say the rest out loud too, because the person
+        # who most needs to hear it is the one who just wrote the hardest
+        # thing they carry and is now waiting to be told it did not qualify.
+        '<p>Every testimony is read by a person, as every testimony is in '
+        'this era. That reading is to keep out machines, spam and second '
+        'records, nothing else. <strong>No testimony is ever refused for '
+        'being dark, heavy, plain, or short.</strong></p>'
+        '<p>When yours is confirmed, your number is assigned in sequence, '
+        'your light is added, and your number is sent to '
         '<strong id="rec_email"></strong>. If anything needs another pass, '
-        'you will hear back at the same address.</p>'
+        'you will hear at the same address.</p>'
         '<h2>YOUR CONTINUITY KEY</h2>'
         '<p>Shown once, now, never again. It was created in your browser a '
         'moment ago; The Record holds only its fingerprint, not the key. It '
@@ -1474,16 +1687,25 @@ def render_begin(qmeta):
         '<p>For your safety, keys are shown only once and are never kept '
         'here. If you wrote yours down, all is well. If you left before '
         'saving your continuity key, it cannot be shown again.</p>'
-        '<p><a href="index.html">Return to the lights</a></p>'
+        '<p class="center quiet">Is someone else writing on this computer? '
+        '<a href="enter.html">Begin a new testimony</a>.</p>'
+        '<p class="center gohome"><a class="aura" href="index.html">'
+        'RETURN TO THE LIGHTS</a></p>'
         '</div>')
     parts.append(
         '<div id="closing" class="hidden">'
-        '<p class="meta">__BRAND__ is free, for every human, always. It is '
-        'kept alive by donations, and every dollar received and spent is '
-        'public: <a href="' + brand.DONATE_URL + '" '
-        'rel="noopener">help keep the lights on</a>. A donation buys nothing '
-        'here: no marks, no priority, no tiers.</p>'
-        '<p><a href="index.html">Return to the lights</a></p>'
+        '<p>__BRAND__ is free, for every human, always. It is kept alive by '
+        'donations, and every dollar received and spent is public. A '
+        'donation buys nothing here: no marks, no priority, no tiers.</p>'
+        + ('<p class="center"><a class="finish" href="' + brand.DONATE_URL + '" '
+           'rel="noopener">HELP KEEP THE LIGHTS ON</a></p>'
+           if brand.DONATE_READY else '')
+        # The way home is the last thing a person sees, and it was a line
+        # of small text they had to hunt for. It is the brightest thing on
+        # the screen now, because after writing your testimony the archive
+        # should feel like it is holding a door open for you.
+        + '<p class="center gohome"><a class="aura" href="index.html">'
+        'RETURN TO THE LIGHTS</a></p>'
         '</div>')
     parts.append(
         '<div id="fallback">'

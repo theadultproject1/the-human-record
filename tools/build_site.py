@@ -467,6 +467,13 @@ _SYNTHETIC_VERSION = {
 def render_human(entry, versions, qbyid, order):
     rid = entry["registry_id"]
     name = entry.get("chosen_name")
+    # Never print a name whose answer is sealed, whatever the entry says.
+    # enroll.py stops writing one, but records enrolled before that fix
+    # still carry it, and this page is the thing that actually leaks. Two
+    # independent guards, because a broken seal cannot be un-published.
+    if any(((v.get("answers") or {}).get("q_name") or {}).get("visibility")
+           == "sealed_until_death" for v in versions):
+        name = None
     title = f'#{rid}' + (f' · {name}' if name else '')
     body = [f'<h1><span class="number">Human #{esc(rid)}</span></h1>']
     if name:
@@ -574,8 +581,28 @@ def render_lights(humans, has_film=False):
   var h = document.getElementById('hail');
   var film = document.getElementById('film');
   var v = document.getElementById('introv');
+  // Remembered in localStorage, not sessionStorage, and the difference
+  // is the whole bug: sessionStorage is per TAB and per ORIGIN, so the
+  // film greeted you again in every new tab and on every arrival from
+  // the Reading Room (info. is a different origin). The obvious fix —
+  // "skip it if they came from our own site" — is impossible here: the
+  // Referrer-Policy is no-referrer by choice, so document.referrer is
+  // always empty. localStorage simply remembers. The film welcomes
+  // someone who has never seen it; it never interrupts someone who has.
+  // Once a month, not once ever. Someone showing the Record to a friend
+  // should be able to show them the film too, without clearing browser
+  // storage to do it — but nobody should be made to watch it again on a
+  // Tuesday visit. So the date of the last viewing is remembered, and
+  // after thirty days the door opens with the film again. A stale value
+  // from before this rule reads as long ago, which simply means the film
+  // plays once more and then settles into the monthly rhythm.
+  var MONTH = 30 * 24 * 60 * 60 * 1000;
   var seen = false;
-  try {{ seen = sessionStorage.getItem('ah_hail') === '1'; }} catch(e) {{}}
+  try {{
+    var last = parseInt(localStorage.getItem('ah_hail') || '0', 10);
+    seen = last > 0 && (Date.now() - last) < MONTH;
+  }} catch(e) {{}}
+  if (!seen) {{ try {{ seen = sessionStorage.getItem('ah_hail') === '1'; }} catch(e) {{}} }}
   function drop(el){{ if (el && el.parentNode) el.parentNode.removeChild(el); }}
   if (seen) {{ drop(h); drop(film); return; }}
   var opened = false, done = false;
@@ -590,6 +617,10 @@ def render_lights(humans, has_film=False):
   }}
   function go(){{
     if (opened) return; opened = true;
+    // Two separate try blocks: in private browsing one store can throw
+    // while the other works, and a failure to remember must never stop
+    // the film from opening.
+    try {{ localStorage.setItem('ah_hail', String(Date.now())); }} catch(e) {{}}
     try {{ sessionStorage.setItem('ah_hail', '1'); }} catch(e) {{}}
     h.classList.add('gone');
     setTimeout(function(){{ drop(h); }}, 1000);
@@ -667,6 +698,15 @@ def main():
 
     def put(relpath, html_text, *served_paths):
         html_text = _finalize(html_text, mode)
+        # Parse before writing. A page whose script does not parse is a
+        # page whose every button is dead, and it looks completely normal
+        # from here: valid HTML, correct CSP hash, right words on screen.
+        broken = ahlib.js_syntax_errors(html_text, relpath)
+        if broken:
+            raise SystemExit(
+                "build refused: a page's JavaScript does not parse, so the\n"
+                "browser would run none of it and every control on that page\n"
+                "would be dead:\n  " + "\n  ".join(broken))
         (SITE / relpath).write_text(html_text, encoding="utf-8")
         policy = csp.page_csp(html_text)
         for served in served_paths:
@@ -856,6 +896,25 @@ been lit; The Record assigns each number only once, at enrollment.</p>
             "User-agent: *\nDisallow: /\n", encoding="utf-8", newline="\n")
 
     print(f"site built: {len(humans)} human(s), {len(events)} log event(s) -> site/")
+    print("JAVASCRIPT: every page parsed" if ahlib.node_available() else
+          "JAVASCRIPT: NOT CHECKED — node is not on this machine, so a typo in\n"
+          "            a page's script would ship silently and kill every\n"
+          "            control on that page. Do not deploy from here.")
+    # Say the door's state out loud, every single build.
+    #
+    # 2026-08-01: the registry was open, the suites were run before
+    # deploying (correctly), and test_gate.sh rebuilt site/ WITHOUT
+    # AH_REGISTRY_OPEN in order to have a worker to test. The next deploy
+    # shipped that build and closed the archive to the public. Nobody was
+    # turned away, but only because nobody came in those four minutes.
+    #
+    # The lesson is not "remember the flag". It is that a build which
+    # decides something this large must never do it quietly.
+    print("REGISTRY: OPEN — the consent page invites people to write"
+          if pages.REGISTRY_OPEN else
+          "REGISTRY: CLOSED — the consent page says the Record will soon open\n"
+          "          (set AH_REGISTRY_OPEN=true before building to deploy an\n"
+          "           open archive; the test suites build closed by design)")
 
 
 if __name__ == "__main__":

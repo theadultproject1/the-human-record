@@ -4,6 +4,13 @@ Usage:
     python tools/enroll.py path/to/sitting.json
         [--email you@example.org]      anchor email when no envelope exists
         [--vouched-by NNN]             record the vouch edge (voucher's number)
+        [--founder-vouch]              admit a Tier 0 sitting on the founder's
+                                       own word (POLICY, Verification: the
+                                       founder's hand-vouch). Records no edge;
+                                       the record reads "founding era — founder
+                                       vouch" forever. Not the same act as
+                                       reviewing, which happens to every
+                                       submission.
         [--anchor-override "reason"]   enroll past an anchor match (recorded)
 
 Uniqueness (one human, one record — schema/ANCHORS.md): before any
@@ -116,11 +123,45 @@ def main():
     ignore_env_vouch = "--ignore-envelope-vouch" in args
     if ignore_env_vouch:
         args.remove("--ignore-envelope-vouch")
+    founder_vouch = "--founder-vouch" in args
+    if founder_vouch:
+        args.remove("--founder-vouch")
     if len(args) != 1:
         print(__doc__)
         sys.exit(2)
     sitting_path = Path(args[0])
     sitting = json.loads(sitting_path.read_text(encoding="utf-8"))
+
+    # The founder's hand-vouch (POLICY, Verification): "during the
+    # founding period, before phone machinery exists, the founder records
+    # the granting verification by hand on each reviewed submission", and
+    # "the founder's hand-vouch remains available where no invitation
+    # exists". Everyone arriving now is Tier 0, because nobody holds a
+    # number yet and so nobody can invite anyone: the first records can
+    # only come this way.
+    #
+    # It is deliberately NOT the same act as reviewing. Every submission
+    # is reviewed; if that alone raised the tier, every record would be
+    # Tier 2 by definition and the standard each record carries would
+    # stop meaning anything, which the Constitution requires it to mean
+    # ("every record shall bear, visibly, the verification standard of
+    # its era"). So it is a separate flag, typed on purpose, and the era
+    # string says plainly how the record was admitted.
+    if founder_vouch:
+        if vouched_by:
+            print("REFUSED: --founder-vouch and --vouched-by are different")
+            print("things. A peer invitation is an edge between two numbers;")
+            print("the founder's hand-vouch is the founder's own word, and")
+            print("records no edge. Use one.")
+            sys.exit(2)
+        was = (sitting.get("verification") or {}).get("tier")
+        sitting["verification"] = {"tier": 2,
+                                   "era": "founding era — founder vouch"}
+        print(f"founder vouch: admitting a Tier {was} sitting as Tier 2 on the")
+        print("founder's own attestation. The record will say so, forever:")
+        print('  verification: "founding era — founder vouch"')
+        print("No vouch edge is recorded; there is no voucher's number to bind.")
+
     qmeta, qbyid = load_questionnaire()
     problems = validate(sitting, qmeta, qbyid)
     if problems:
@@ -271,6 +312,20 @@ def main():
         if sitting.get(opt):
             entry[opt] = sitting[opt]
 
+    # A sealed name is a sealed name. chosen_name is the PUBLIC display
+    # name, and it carries the same text the author typed into q_name; if
+    # they sealed that answer and we copy it here anyway, the entry
+    # publishes in its heading exactly what the seal was asked to hide.
+    # That shipped, and #000000002 sealed her name and saw it printed at
+    # the top of her own page. The safest data is data never held: when
+    # q_name is sealed there is no public display name, so none is kept.
+    if (((sitting.get("answers") or {}).get("q_name") or {})
+            .get("visibility") == "sealed_until_death"):
+        if entry.pop("chosen_name", None) is not None:
+            print("note: the name answer is sealed, so no public display name "
+                  "is recorded. The page will show the number alone until the "
+                  "seal opens.")
+
     # The Legacy Key (POLICY.md, The seal): if answers were sealed, the
     # author's browser minted six words and sent only their stretched
     # fingerprint. It is stored here — never published — so that one day
@@ -364,12 +419,24 @@ def main():
     print()
     print("next: python tools/verify.py && python tools/build_site.py && git add -A && git commit")
     # The letter comes AFTER the deploy, so the address in it already
-    # answers when they click it. Printed, never sent from here: spending
-    # a number and writing to a person are two separate acts, and the
-    # second one must not be able to disturb the first.
+    # answers when they click it. Never SENT from here: spending a number
+    # and writing to a person are two separate acts, and the second one
+    # must not be able to disturb the first. So it is queued into custody
+    # instead, and send_letters.py posts it once the page is live. The
+    # first human was nearly never told, because remembering a command
+    # was the only thing holding the promise up.
     if emails:
-        print(f"then, once deployed: python tools/notify_author.py {int(rid)} "
-              f"--email {emails[0]} --send")
+        try:
+            import send_letters
+            if send_letters.queue(int(rid), emails[0]):
+                print(f"letter queued for {emails[0]}; it will be sent once "
+                      f"the record is deployed and answering.")
+            else:
+                print(f"letter already queued or sent for #{int(rid)}; not queued again.")
+        except Exception as exc:                       # noqa: BLE001
+            print(f"could not queue the letter ({exc}). Send it by hand once deployed:")
+            print(f"  python tools/notify_author.py {int(rid)} "
+                  f"--email {emails[0]} --send")
 
 
 if __name__ == "__main__":

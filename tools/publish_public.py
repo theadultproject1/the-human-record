@@ -42,7 +42,14 @@ Standard library only.
 import re
 import shutil
 import sys
+import urllib.request
 from pathlib import Path
+
+# Where the published copy lives, so drift can be checked against the
+# real thing rather than against a local folder that might itself be
+# stale.
+PUBLIC_RAW = ("https://raw.githubusercontent.com/theadultproject1/"
+              "the-human-record/main/log/registry.log.jsonl")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ahlib
@@ -194,11 +201,44 @@ def scan(paths):
     return hits
 
 
+def check_drift():
+    """Is the published copy still telling the truth?
+
+    Silence is the danger here. If a publish is forgotten, the website
+    keeps saying anyone may verify while the public log falls behind —
+    and nothing anywhere complains. So this compares the live public log
+    against this one and says plainly which it is.
+    """
+    local = (ROOT / "log" / "registry.log.jsonl").read_text(
+        encoding="utf-8").strip().splitlines()
+    try:
+        with urllib.request.urlopen(PUBLIC_RAW, timeout=30) as r:
+            remote = r.read().decode("utf-8").strip().splitlines()
+    except Exception as exc:                       # noqa: BLE001
+        print(f"could not read the public log ({exc.__class__.__name__}). "
+              "No network, or the repository moved.")
+        return 1
+    if local == remote:
+        print(f"public copy is CURRENT — {len(local)} log line(s), identical.")
+        return 0
+    behind = len(local) - len(remote)
+    if behind > 0:
+        print(f"public copy is BEHIND by {behind} log line(s). "
+              "Publish: python tools/publish_public.py --write ../public-record")
+    else:
+        print("public log DIFFERS from this one and is not simply behind. "
+              "Something rewrote history on one side; investigate before "
+              "publishing anything over it.")
+    return 1
+
+
 def main():
     args = sys.argv[1:]
     if "-h" in args or "--help" in args:
         print(__doc__)
         return 0
+    if "--check" in args:
+        return check_drift()
     if ahlib.resolve_mode() == "drill":
         print("REFUSED: a drill must never publish. Run this from the real "
               "repository.")

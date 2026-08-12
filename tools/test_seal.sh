@@ -99,7 +99,41 @@ if grep -q "Words from another century." site/3/index.html && grep -q "opened by
   ok "1920 record's seal opened by time, no ceremony"
 else bad "century door did not open"; fi
 
-echo "6) verify.py holds after everything"
+echo "6) a sealed NAME is never printed as the display name"
+# #000000002 sealed her name and the page printed it in the heading and
+# the browser tab, because chosen_name is a second copy of the same words
+# and nothing checked the seal before publishing it. Three guards now:
+# the browser sends no public name, enroll.py records none, and the site
+# prints none. This proves the last two, which are the ones that publish.
+"$PY" - <<'PYEOF'
+import json, pathlib, sys
+sys.path.insert(0, 'tools')
+import ahlib, enroll
+sitting = {"chosen_name": "Hidden Person",
+           "verification": {"tier": 2, "era": "founding era — founder vouch"},
+           "answers": {"q_name": {"text": "Hidden Person", "visibility": "sealed_until_death"},
+                       "q_place": {"text": "Earth", "visibility": "public"},
+                       "q_hope": {"text": "That the seal is kept exactly as asked.",
+                                  "visibility": "public"}}}
+pathlib.Path('inbox').mkdir(exist_ok=True)
+pathlib.Path('inbox/sealedname.json').write_text(
+    json.dumps(sitting, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+PYEOF
+"$PY" tools/enroll.py inbox/sealedname.json --email sealed@example.org \
+      --founder-vouch --yes >/dev/null 2>&1
+NEW=$(ls -d registry/0000000* | sort | tail -1)
+if "$PY" -c "
+import json,sys
+e=json.load(open('$NEW/entry.json',encoding='utf-8'))
+sys.exit(0 if 'chosen_name' not in e else 1)"; then
+  ok "enroll.py records no public name when the name answer is sealed"
+else bad "enroll.py wrote chosen_name for a sealed name"; fi
+"$PY" tools/build_site.py >/dev/null 2>&1
+if grep -rq "Hidden Person" site/ 2>/dev/null; then
+  bad "the sealed name was published on the site"
+else ok "the sealed name appears nowhere in the built site"; fi
+
+echo "7) verify.py holds after everything"
 if "$PY" tools/verify.py 2>&1 | grep -q "^OK"; then ok "verify passes"; else bad "verify failed"; fi
 
 echo

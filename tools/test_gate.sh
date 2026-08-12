@@ -150,6 +150,12 @@ if [ "$C1" = "200" ] && [ "$C2" = "200" ] && [ "$C3" = "429" ] && echo "$R3" | g
   ok "first two accepted, third refused (429 rate limit)"
 else bad "rate limit wrong: [$C1 $C2 $C3] ($R3)"; fi
 
+echo "8b) a one-word place is a whole answer, not a thin one"
+R=$(run shortplace 10.9.0.12); C=$(code_of "$R")
+if [ "$C" = "200" ] && echo "$R" | grep -q '"ok":true'; then
+  ok "\"Paris\" accepted alongside two real answers"
+else bad "a one-word place was refused: $R"; fi
+
 echo "9b) acceptance flood — the token-less front-of-funnel is rate limited (D5)"
 A1=$(code_of "$(run accept 10.9.0.11)"); A2=$(code_of "$(run accept 10.9.0.11)")
 A3=$(code_of "$(run accept 10.9.0.11)"); A4=$(code_of "$(run accept 10.9.0.11)")

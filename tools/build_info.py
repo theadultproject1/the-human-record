@@ -28,8 +28,18 @@ a{color:#1a1a1a}
 h1{font-weight:normal;letter-spacing:.14em;font-size:1.3em}
 h2{font-weight:normal;line-height:1.25;margin-top:2.2em;padding-top:1.2em;border-top:1px solid #e0dcd0}
 h3{font-weight:normal;font-style:italic;margin-bottom:.3em}
-nav.toc{font-size:.92em;color:#555;margin:1.5em 0 2.5em}
-nav.toc a{margin-right:.35em}
+/* A contents list, not a paragraph of links. Nine entries separated by
+   middots ran together into a grey wall that nobody reads: the eye had
+   no line to follow and no place to rest. Given its own lines inside a
+   quiet panel, it can be scanned in a second. Two columns where there
+   is room, one on a phone, because a narrow column of two-word links
+   is worse than a list. */
+nav.toc{font-size:.95em;margin:1.2em 0 2.6em;padding:1.05em 1.3em;background:#f7f5ee;border:1px solid #e6e1d3;border-radius:2px}
+nav.toc ul{list-style:none;margin:0;padding:0;columns:2;column-gap:2.2em}
+nav.toc li{margin:.34em 0;break-inside:avoid}
+nav.toc a{color:#3a3428;text-decoration:none;border-bottom:1px solid #ded8c8}
+nav.toc a:hover{border-bottom-color:#8a8264;color:#1a1a1a}
+@media(max-width:34em){nav.toc ul{columns:1}}
 .meta{color:#555;font-size:.9em}
 pre.doc{white-space:pre-wrap;font-family:inherit;font-size:.97em}
 dt{font-style:italic;margin-top:1.4em}
@@ -38,6 +48,19 @@ footer{margin-top:3em;padding-top:1em;border-top:1px solid #ccc;font-size:.85em;
 .lights{display:inline-block;border:1px solid #8a8264;background:#06070a;color:#e8e3d6;letter-spacing:.12em;padding:.7em 1.6em;border-radius:2px;text-decoration:none;font-size:.9em}
 ul.docs li{margin:.6em 0}
 p.golights{margin-top:3em}
+/* The introduction, offered rather than imposed: a link on a reading
+   page, opening over it, closable at any second. The Record's own front
+   door plays this film once a month; here it plays whenever it is
+   asked, because someone showing it to a friend should never have to
+   wait for a calendar. */
+p.watch{margin:.8em 0 1.1em}
+a.watch{display:inline-block;border:1px solid #8a8264;background:#06070a;color:#e8e3d6;letter-spacing:.1em;padding:.6em 1.3em;border-radius:2px;text-decoration:none;font-size:.85em}
+a.watch:hover{background:#0d0f14}
+.filmwrap{position:fixed;inset:0;z-index:50;background:#000;display:none}
+.filmwrap.on{display:block}
+.filmwrap video{width:100%;height:100%;object-fit:contain;background:#000}
+button.skipfilm{position:absolute;right:14px;bottom:14px;background:rgba(6,7,10,.6);border:1px solid #55503f;color:#c9c4b8;font-family:inherit;font-size:.8em;letter-spacing:.12em;padding:.5em 1.1em;border-radius:3px;cursor:pointer}
+button.skipfilm:hover{border-color:#c9c4b8;color:#e8e3d6}
 """
 
 
@@ -81,15 +104,25 @@ a dark sky of lights, one for every human who chose to stamp their
 passage on Earth. This page explains how it works, what keeps its
 promises, and where every official document lives.</p>
 
+<p class="watch"><a class="watch" href="#" id="watchfilm">▶ WATCH THE INTRODUCTION</a></p>
+
+<div class="filmwrap" id="filmwrap">
+<video id="introv" src="intro-v1.mp4" preload="none" playsinline></video>
+<button class="skipfilm" id="skipfilm">SKIP &#8594;</button>
+</div>
+
 <nav class="toc">
-<a href="#what">what is __BRAND__?</a> ·
-<a href="#joining">how joining works</a> ·
-<a href="#key">the keys &amp; invitation</a> ·
-<a href="#forever">what makes a testimony stamped forever?</a> ·
-<a href="#withdrawal">withdrawal</a> ·
-<a href="#stewardship">stewardship</a> ·
-<a href="#documents">the documents</a> ·
-<a href="#faq">FAQ</a>
+<ul>
+<li><a href="truth.html">how to verify the truth</a></li>
+<li><a href="#what">what is __BRAND__?</a></li>
+<li><a href="#joining">how joining works</a></li>
+<li><a href="#key">the keys and invitation</a></li>
+<li><a href="#forever">what makes a testimony stamped forever?</a></li>
+<li><a href="#withdrawal">withdrawal</a></li>
+<li><a href="#stewardship">stewardship</a></li>
+<li><a href="#documents">the documents</a></li>
+<li><a href="#faq">FAQ</a></li>
+</ul>
 </nav>
 
 <h2 id="what">What is __BRAND__?</h2>
@@ -328,6 +361,155 @@ that work.</dd>
 </dl>
 
 <p class="golights"><a class="lights" href="MAIN_URL">GO TO THE LIGHTS</a></p>
+
+<script>
+(function(){
+  var link = document.getElementById('watchfilm');
+  var wrap = document.getElementById('filmwrap');
+  var v = document.getElementById('introv');
+  var skip = document.getElementById('skipfilm');
+  if (!link || !wrap || !v) return;
+  function close(){
+    try { v.pause(); v.currentTime = 0; } catch(e) {}
+    wrap.classList.remove('on');
+    document.removeEventListener('keydown', onKey, true);
+  }
+  function onKey(e){ if (e.key === 'Escape') { e.preventDefault(); close(); } }
+  link.addEventListener('click', function(e){
+    e.preventDefault();
+    // The click IS the gesture a browser requires before sound may play,
+    // which is why this opens from a link rather than starting by itself.
+    // preload is 'none' until then: nobody downloads twenty-three
+    // megabytes for a page they came to read.
+    wrap.classList.add('on');
+    document.addEventListener('keydown', onKey, true);
+    var p = v.play();
+    if (p && p.catch) p.catch(close);
+  });
+  v.addEventListener('ended', close);
+  v.addEventListener('error', close);
+  if (skip) skip.addEventListener('click', close);
+})();
+</script>
+"""
+
+
+TRUTH_BODY = """
+<h1>How to verify the truth</h1>
+
+<p class="meta">Written for someone with no technical background. If you
+would rather see the commands, they are at the bottom.</p>
+
+<p>__BRAND__ makes some large promises. Your words will never be
+edited. Your number will never be given to anyone else. Nothing will be
+quietly deleted or rewritten later. Anyone can say those things. This
+page is about why you do not have to take our word for them.</p>
+
+<h2>The short version</h2>
+
+<p>Every promise __BRAND__ makes can be checked by a stranger, using a
+copy of the archive that we do not control and cannot edit. If we ever
+broke one of those promises, even by a single letter, even years from
+now, the check would fail publicly, on every copy in the world. Not
+because we confessed, but because the mathematics stopped agreeing.</p>
+
+<h2>How that works, without the jargon</h2>
+
+<h3>1. Every testimony leaves a mark that only it could leave</h3>
+
+<p>When someone writes a testimony, the Record takes a kind of
+fingerprint of it. Think of an ink stain: those exact words, and no
+others, could have made that exact shape.</p>
+
+<p>Anyone can look at the stain. Nobody can read the words back out of
+it, because it only works in one direction. But bring the true words
+back and they fit it perfectly. So the stain proves the words are
+unchanged without ever revealing them.</p>
+
+<h3>2. Every mark is tied to the one before it</h3>
+
+<p>Those fingerprints are kept in a single list, and each entry is tied
+to the entry above it. Change one, whether a name, a comma or a date,
+and every entry below it stops matching. You cannot quietly correct one line in
+the middle. The damage shows immediately, and it shows to everyone, not
+only to us.</p>
+
+<h3>3. So we cannot simply rewrite the whole list</h3>
+
+<p>That is the obvious next question, and it is the right one. If we
+control the list, what stops us rebuilding the entire thing to hide
+something?</p>
+
+<p>This: at regular moments we take a fingerprint of the whole list and
+place it in the <strong>Bitcoin</strong> blockchain, a public ledger
+spread across the world that nobody can edit, least of all us. It is
+the closest thing the internet has to carving a date into stone in a
+public square.</p>
+
+<p>That fixes what the Record contained at that moment. If we rewrote
+history afterwards, the rewritten version would no longer match the
+stone. Anyone checking would see it. <strong>We cannot backdate.</strong></p>
+
+<h3>4. The instructions are public, so someone else can check our work</h3>
+
+<p>The whole method is published openly: the code, the rules, and the
+list of fingerprints. Not a description of it; the actual thing. Anyone can
+take a copy and run the check themselves, on their own computer,
+without asking us and without us knowing.</p>
+
+<p>That is the part that matters. A promise you have to trust is a
+promise. A promise anyone can test is something better.</p>
+
+<h2>What this does <em>not</em> prove</h2>
+
+<p>We would rather say this plainly than let you discover it later.</p>
+
+<ul>
+<li><strong>It does not prove anyone told the truth about their own
+life.</strong> The Record proves that words were not altered after they
+were written. Whether a person was honest with the future is between
+them and the future.</li>
+<li><strong>It does not make the archive impossible to destroy.</strong>
+Nothing is. It makes tampering <em>detectable</em>, and it makes copies
+easy to keep, which is how things actually survive centuries.</li>
+<li><strong>It does not mean nothing can go wrong.</strong> It means
+that if something does, it cannot be hidden.</li>
+</ul>
+
+<h2>You do not have to check this yourself</h2>
+
+<p>Almost nobody will, and that is fine. The protection does not come
+from every reader running a check. It comes from the fact that
+<em>anyone can</em>: a journalist, a researcher, a suspicious
+stranger, someone in eighty years who has never heard of us. An
+institution that can be checked at any moment by anyone tends to behave
+as though it is being checked.</p>
+
+<p>You are trusting mathematics and daylight, rather than our good
+intentions. That is the whole idea.</p>
+
+<h2>If you would like to check it yourself</h2>
+
+<p>You will need a computer with Python on it. There is nothing to
+install and no account to make. Everything lives in
+<a href="https://github.com/theadultproject1/the-human-record">the
+public repository</a>, on GitHub, which is simply a website where code
+and files are published openly so anyone can copy them.</p>
+
+<p>Open a terminal and run these three lines. The first copies the
+whole archive to your computer; the last one checks it.</p>
+
+<pre class="doc">git clone https://github.com/theadultproject1/the-human-record
+cd the-human-record
+python tools/verify.py</pre>
+
+<p>If it prints <strong>OK</strong>, everything on this page held at the
+moment you ran it: nothing altered, no number reused, the founding
+documents unchanged, every withdrawal recorded. If it prints anything
+else, you have found something, and we would want to know. There is a
+private way to tell us, described in that repository.</p>
+
+<p class="golights"><a class="lights" href="MAIN_URL">GO TO THE LIGHTS</a></p>
 """
 
 
@@ -344,6 +526,11 @@ def main():
 
     def put(name, html_text):
         html_text = build_site._finalize(html_text, mode)
+        broken = ahlib.js_syntax_errors(html_text, name)
+        if broken:
+            raise SystemExit(
+                "build refused: a page's JavaScript does not parse, so the\n"
+                "browser would run none of it:\n  " + "\n  ".join(broken))
         (OUT / name).write_text(html_text, encoding="utf-8")
         policy = csp.page_csp(html_text)
         served = [f"/{name}", f"/{name[:-len('.html')]}"]
@@ -358,6 +545,22 @@ def main():
              "what makes a testimony stamped forever, withdrawal, the official "
              "documents, and the FAQ.",
              INDEX_BODY.replace("MAIN_URL", MAIN).replace("allhumans.world", brand.DOMAIN).replace("__DONATE_URL__", brand.DONATE_URL)))
+
+    put("truth.html",
+        page("How to verify the truth · __BRAND__",
+             "Why you do not have to take __BRAND__ at its word: the "
+             "fingerprints, the chain, the Bitcoin timestamp, and the "
+             "public code, explained without jargon.",
+             TRUTH_BODY.replace("MAIN_URL", MAIN)))
+
+    # The film, beside the page that explains why any of it can be
+    # trusted. Copied rather than linked across from the main site: the
+    # Reading Room's own Content-Security-Policy allows media only from
+    # itself, and loosening a security header is a worse price to pay
+    # than a duplicated file.
+    film = ahlib.ROOT / "site-assets" / "intro-v1.mp4"
+    if film.exists():
+        shutil.copyfile(film, OUT / "intro-v1.mp4")
 
     docs = [
         ("MISSION.md", "mission.html", "The Mission",
@@ -396,7 +599,12 @@ def main():
         (OUT / "robots.txt").write_text(
             "User-agent: *\nDisallow: /\n", encoding="utf-8", newline="\n")
 
-    print(f"reading room built: {1 + len(docs)} page(s) -> info-site/")
+    # Counted from what was actually written, not from a sum kept by
+    # hand: the hand-kept one was already wrong the moment a page was
+    # added, and a build that misreports itself is a small lie told on
+    # every run.
+    print(f"reading room built: {len(list(OUT.glob('*.html')))} page(s) "
+          f"-> info-site/")
 
 
 if __name__ == "__main__":

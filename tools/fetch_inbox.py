@@ -62,6 +62,22 @@ LEGACY = INBOX / "legacy"
 API = "https://api.cloudflare.com/client/v4"
 
 
+def already_handled(filename):
+    """Has the desk already dealt with this one?
+
+    Enrolling, refusing and holding all MOVE the file out of inbox/ into
+    a folder beside it. Checking only the original path therefore made
+    every resolved submission look new again, so the next fetch pulled it
+    back from KV and the watchdog announced refused testimonies as fresh
+    arrivals. The dead do not come back. (Found 2026-08-01, after four
+    refusals reappeared within the minute.)
+    """
+    for sub in ("refused", "enrolled", "held", "withdrawals", "legacy"):
+        if (INBOX / sub / filename).exists():
+            return True
+    return False
+
+
 def submissions_namespace():
     """The KV namespace THIS tree's worker writes to.
 
@@ -157,6 +173,7 @@ def main():
     INBOX.mkdir(exist_ok=True)
     ACCEPT.mkdir(exist_ok=True)
     fetched = 0
+    purged_held = 0   # remote copies of records we already hold locally
     returns = []
     withdrawals = []
     legacies = []
@@ -180,7 +197,17 @@ def main():
             dest = LEGACY / f"{safe}.json"
         else:
             dest = INBOX / f"{safe}.json"
-        if dest.exists():
+        if dest.exists() or already_handled(dest.name):
+            # We already hold this one, so there is nothing to fetch. But the
+            # remote copy is still plaintext on the web host, and skipping
+            # straight past it meant --purge quietly deleted nothing: a
+            # testimony refused or enrolled weeks ago sat in KV forever while
+            # the run reported "remote copies purged from KV". Having the
+            # local copy is exactly what makes the remote one safe to delete.
+            if purge:
+                call(token, f"{base}/values/{urllib.parse.quote(key, safe='')}",
+                     method="DELETE")
+                purged_held += 1
             continue
         raw = call(token, f"{base}/values/{urllib.parse.quote(key, safe='')}")
         record = json.loads(raw)  # refuse to land anything that isn't JSON
@@ -250,6 +277,9 @@ def main():
 
     kept = "purged from KV" if purge else "left in KV (run with --purge to delete)"
     print(f"fetched {fetched} new record(s) -> inbox/ ; remote copies {kept}")
+    if purged_held:
+        print(f"also purged {purged_held} remote cop(ies) of records already held "
+              f"here — plaintext should not outlive its collection")
     print("next: python tools/review.py")
 
 
