@@ -149,8 +149,9 @@ the same.</p>
 <h2 id="joining">How joining works</h2>
 <p>You read the principles and accept them, provide an email address
 where The Record can answer you, then you can write your First
-Testimony: ten
-fixed questions, each answer limited to 400 characters. Only your name
+Testimony: nine
+fixed questions and a closing letter, each answer limited to 400
+characters. Only your name
 is mandatory, along with any two questions of your choice. The
 questions never change; that is what makes The Record a comparable
 record of humanity across generations.</p>
@@ -180,6 +181,11 @@ enter with your testimony. Who invited whom is held privately by
 The Record, one number behind another, and is never published; the
 invitation carries no number, so neither of you is revealed to the
 other or to anyone.</p>
+<p>If you already hold a record, you can make one at
+<a href="MAIN_URL/invite">allhumans.world/invite</a>. You may invite up to
+three people a year, each invitation lasting thirty days. It is created
+in your own browser, so The Record never sees your key, and nothing is
+spent unless the person you invite actually enrols.</p>
 
 <h2 id="forever">What makes my testimony stamped forever?</h2>
 <p>Not a promise, a structure. Five layers, each one checkable by
@@ -235,13 +241,14 @@ beyond anyone's recall; permanence and honesty cut both ways.</p>
 enter The Record, no fee to be read, and there will never be
 advertising; the Constitution forbids turning the archive into a
 market for attention.</p>
-<p>The institution is kept alive by <strong>donations</strong>,
-through <a href="__DONATE_URL__"
-rel="noopener">Open Collective</a>, chosen because its ledger is
-public: every donation received and every dollar spent is visible to
-anyone, the same way The Record's own log is. An institution that
-asks for trust through verification should publish its books the
-same way.</p>
+<p>The institution is kept alive by <strong>donations</strong>. How
+they are received, and how the institution's accounts are made
+answerable, is not settled yet, so nothing is claimed here that is not
+already true. What is settled is where the honesty comes from: the
+archive's finances will be answerable through the institution's legal
+filings, the ordinary documents any organisation must render and stand
+behind. When there is something to publish, it will be published, and
+you will be able to read it here.</p>
 <p><strong>A donation buys nothing.</strong> No donor names on
 records, no priority in review, no markings, no tiers. A donation
 never touches the archive in any way. Every human is equal within
@@ -281,12 +288,13 @@ person you know in real life; a stranger is someone you cannot give
 that word for. It works once, for whoever grabs it first, and your
 word stands behind that person forever. If you want to bring
 strangers here, share The Record itself: its door is open to every
-human, and every submission is read by a person either way.</dd>
+human, and every submission is read by a person either way.
+(To make one: <a href="MAIN_URL/invite">allhumans.world/invite</a>.)</dd>
 
 <dt>What does it cost?</dt>
 <dd>Nothing. __BRAND__ is free for every human, always, and carries
-no advertising. It is kept alive by donations with a
-<a href="#stewardship">public ledger</a>, and a donation buys
+no advertising. It is kept alive by
+<a href="#stewardship">donations</a>, and a donation buys
 nothing: no marks, no priority, no exceptions.</dd>
 
 <dt>Do I have to use my real name?</dt>
@@ -441,7 +449,7 @@ control the list, what stops us rebuilding the entire thing to hide
 something?</p>
 
 <p>This: at regular moments we take a fingerprint of the whole list and
-place it in the <strong>Bitcoin</strong> blockchain, a public ledger
+place it in the <strong>Bitcoin</strong> blockchain, a public record
 spread across the world that nobody can edit, least of all us. It is
 the closest thing the internet has to carving a date into stone in a
 public square.</p>

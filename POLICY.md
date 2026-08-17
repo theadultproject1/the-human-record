@@ -374,10 +374,14 @@ no machinery can do.
 
 - **The Human Record is free for every human, always.** No enrollment fee,
   no reading fee, and never advertising (Constitution, Article I).
-- **The institution is funded by donations only**, received through a
-  platform with a public ledger (currently Open Collective), so that
-  every donation and every expense is visible to anyone — the
-  institution's books are verifiable the same way its archive is.
+- **The institution is funded by donations only.** How they are received
+  is not settled. The 2026-07-07 ruling named a public-ledger platform
+  (Open Collective); that route was **abandoned on 2026-08-11** without a
+  replacement chosen, so no platform is named on any page until one is
+  real. The institution's finances will be answerable through its legal
+  filings, the ordinary documents any organisation must render and stand
+  behind, rather than through a donation platform's ledger. Nothing may
+  claim on any page that the books are public until they are.
 - **A donation buys nothing.** No donor names or marks on records, no
   priority in review, no tiers, no exceptions. A donation never
   touches the archive or the order of the Registry in any way. Every
@@ -444,6 +448,13 @@ no machinery can do.
   pages planned and named; founder hand-vouch bridges until they land.
 - 2026-07-07 — Funding ratified: free forever, donations only via a
   public ledger (Open Collective), donations buy nothing.
+- 2026-08-11 — Public-ledger funding **abandoned**. Open Collective is
+  not adopted and no replacement is chosen; every mention and link is
+  removed from the site rather than left pointing at a platform the
+  institution never joined. Free forever and "a donation buys nothing"
+  are unchanged. Financial answerability moves to the institution's
+  legal filings. The 2026-07-07 ruling stands as history, superseded
+  here rather than rewritten.
 - 2026-07-07 — Recorded settled reading of Article I: Registry numbers are
   chronological identifiers, never a measure of worth. Clarifies the
   Constitution without altering it. Also aligned MISSION verification to

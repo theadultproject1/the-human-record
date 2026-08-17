@@ -27,6 +27,11 @@ inbox/*
 # wrangler's local cache — deployment plumbing, never part of the record
 .wrangler/
 
+# wrangler itself, pinned in package.json so every deploy uses the same
+# already-resolved binary instead of asking npx to find one on every
+# click. The lockfile is tracked; the installed tree is not.
+node_modules/
+
 # Local Worker secrets for `wrangler pages dev` (the ceremony HMAC secret
 # and any tuned gate limits). The real secret lives in Cloudflare's secret
 # store, never in the repo. This file is for local testing only.

@@ -19,6 +19,7 @@ import hashlib
 import html
 import json
 import math
+import os
 import shutil
 import sys
 from datetime import datetime, timedelta, timezone
@@ -47,7 +48,10 @@ FOOTER_TAGLINE = (
     "at most three testimonies, kept forever. This page is only a view; the "
     "testimony it shows is kept and proven elsewhere. Free for every human, "
     "kept alive by "
-    '<a href="' + brand.DONATE_URL + '" rel="noopener">donations</a>.'
+    # A link only when there is somewhere to send people. An empty href
+    # reloads the page, which is a worse answer than plain words.
+    + ('<a href="' + brand.DONATE_URL + '" rel="noopener">donations</a>.'
+       if brand.DONATE_READY else "donations.")
 )
 
 PAPER_CSS = """
@@ -72,6 +76,15 @@ html,body{margin:0;padding:0;height:100%;background:#06070a;color:#c9c4b8;font-f
    float above it, and the lights drift behind them. */
 canvas#galaxy{position:fixed;inset:0;width:100vw;height:100vh;display:block;touch-action:none;cursor:grab;z-index:0}
 body.grabbing canvas#galaxy{cursor:grabbing}
+/* A light can still land under the header or the controls — left to
+   chance on purpose (see LIGHTS_JS). What isn't left to chance is
+   whether it stays hidden: the moment a hand actually touches the sky,
+   every word and button steps aside, because that is the one gesture
+   that means someone is looking. They return the instant the hand lets
+   go, so nothing here is a redesign — it is a courtesy that only shows
+   itself when it is needed. */
+body.grabbing .wrap,body.grabbing .ctrls,body.grabbing .ghint{opacity:0;pointer-events:none}
+.wrap,.ctrls,.ghint{transition:opacity .25s ease}
 .wrap{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;pointer-events:none}
 header{text-align:center;padding:1.8em 1em .3em}
 /* fully opaque lettering with a deep dark halo, so the words stay solid
@@ -143,6 +156,16 @@ LIGHTS_JS = """
   // Four decorrelated hashes per number: x, y, DEPTH, and a small twinkle.
   // Depth (0 = near, 1 = far) drives size, brightness and parallax, so the
   // sky has real front-to-back layers — all still fixed to the number.
+  // A hash can still land under the header or the controls (found 2026-08:
+  // a real human's light landed 2.5% from the very top) — left alone on
+  // purpose. An earlier attempt reserved two bands and rerolled anyone who
+  // landed there, which is fair in the same sense a queue-jump is fair,
+  // but it thinned the sky into a visible band at any real population and
+  // was never the actual problem: the problem was that a light could stay
+  // hidden forever, not that it could ever be briefly covered by a word.
+  // The real fix lives where the words are (see body.grabbing below): the
+  // UI itself steps aside the moment anyone touches the sky, so nothing
+  // ever blocks a light from someone who is actually looking.
   var px=new Float64Array(N), py=new Float64Array(N), dpt=new Float64Array(N);
   var dsz=new Float64Array(N), dbr=new Float64Array(N), damp=new Float64Array(N);
   var order=new Array(N);
@@ -754,14 +777,24 @@ def main():
         (SITE / f"{sid}/index.html").write_text(human_html, encoding="utf-8")
     csp_rules.append(("/:human/", human_policy))
 
-    # The intro film (optional): site-assets/intro-v1.mp4 -> /intro-v1.mp4,
-    # played once per session between the hail and the sky. A clone without
-    # the asset builds the classic page. Cloudflare Pages refuses static
-    # files of 25 MiB or more; a build that would die at deploy time must
-    # die HERE, on the builder's machine, instead.
+    # The intro film: NOT on the landing page (2026-08-11).
+    #
+    # It is AI-generated, and visitors recognised that within seconds and
+    # left. An archive whose entire claim is "these are real words from
+    # real people, unedited" cannot introduce itself with a machine's
+    # imitation of a human voice; the medium contradicted the message
+    # before a single testimony could be read. The film still lives in
+    # the Reading Room, where someone who has already chosen to look
+    # around can watch it knowing what it is (tools/build_info.py copies
+    # its own asset and is untouched by this).
+    #
+    # Set AH_LANDING_FILM=1 to put it back, and delete this block outright
+    # when a human-made film replaces it. The plumbing below is kept
+    # deliberately intact so that is a one-line change, not a rebuild.
     PAGES_FILE_LIMIT = 25 * 1024 * 1024
     intro = ahlib.ROOT / "site-assets" / "intro-v1.mp4"
-    has_film = intro.exists()
+    has_film = (intro.exists()
+                and os.environ.get("AH_LANDING_FILM", "").strip() in ("1", "true", "yes"))
     if has_film:
         size = intro.stat().st_size
         if size >= PAGES_FILE_LIMIT:

@@ -34,7 +34,7 @@ def render_legacy():
         'exactly as they intended.<br><em>Some are opened by those we '
         'trust. The rest are opened by time itself.</em></p>')
     parts.append(
-        '<div class="q"><p class="prompt">Their number is…</p>'
+        '<div class="q"><p class="prompt">Their record number is…</p>'
         '<textarea id="l_id" maxlength="9" placeholder="e.g. 2"></textarea></div>')
     parts.append(
         '<div class="q"><p class="prompt">The six words they left me are…</p>'

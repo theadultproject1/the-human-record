@@ -103,7 +103,10 @@ def main():
         return 2
 
     if all(os.environ.get(k) for k in ("CF_ACCOUNT_ID", "CF_API_TOKEN")):
-        subprocess.run([PY, str(ROOT / "tools" / "fetch_inbox.py")],
+        # --purge, always: this runs every ten minutes unattended, so it is
+        # the single biggest reason plaintext would pile up on the web host.
+        # Having the local copy is what makes deleting the remote one safe.
+        subprocess.run([PY, str(ROOT / "tools" / "fetch_inbox.py"), "--purge"],
                        capture_output=True, text=True)
 
     now, before = waiting_now(), read_seen()

@@ -85,10 +85,8 @@ def render_return(qmeta):
         'words will be read by a person, as every testimony is in this era, '
         'and once accepted they will appear on your page. Your continuity '
         'key remains yours alone; it was not stored.</p>'
-        '<p class="meta">__BRAND__ is free, for every human, always, kept '
-        'alive by donations, every dollar public: '
-        '<a href="' + brand.DONATE_URL + '" rel="noopener">help '
-        'keep the lights on</a>.</p>'
+        '<p class="meta">__BRAND__ is free, for every human, always, and '
+        'kept alive by donations.</p>'
         '<p><a href="index.html">Return to the lights</a></p>'
         '</div>')
     parts.append(

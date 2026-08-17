@@ -75,13 +75,13 @@ CONTACT_EMAIL = "enroll@" + DOMAIN
 INFO_URL = "https://info." + DOMAIN
 
 # The donation destination — the ONE place the URL lives, read by every
-# page that mentions donations. It MUST point at a real, claimed
-# collective; the Stewardship copy commits the institution to a public
-# ledger (Open Collective), so the honest choice is a collective whose
-# books anyone can read. AH_DONATE_URL overrides for rehearsals.
-# TODO(founder): create the collective and set the true slug here; until
-# then this link has no live destination.
-_DONATE_PLACEHOLDER = "https://opencollective.com/the-human-record"
+# page that mentions donations. Empty on purpose: the route is not
+# chosen. Open Collective was the plan and is no longer; the institution
+# will be answerable through its legal filings instead of a platform's
+# public ledger, so no platform is named anywhere until one is real.
+# AH_DONATE_URL overrides for rehearsals.
+# TODO(founder): set the true destination here when it exists.
+_DONATE_PLACEHOLDER = ""
 DONATE_URL = _env_override("AH_DONATE_URL", _DONATE_PLACEHOLDER)
 
 # True only once a real destination exists. The placeholder answers 404,

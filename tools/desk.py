@@ -76,6 +76,25 @@ def run(args, timeout=600):
         return False, f"could not run {args!r}: {e}"
 
 
+def run_parallel(seqs, timeout=600):
+    """Like run(), for several independent commands at once. The two Pages
+    projects share nothing at deploy time, so waiting for one before
+    starting the other only adds wall-clock time. Returns results in the
+    same order as seqs (not completion order), so output stays readable."""
+    results = [None] * len(seqs)
+
+    def worker(i, args):
+        results[i] = run(args, timeout=timeout)
+
+    threads = [threading.Thread(target=worker, args=(i, a))
+               for i, a in enumerate(seqs)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return results
+
+
 def esc(s):
     return html.escape(str(s), quote=True)
 
@@ -292,7 +311,7 @@ def dashboard():
                 'it freezes, and Bitcoin stamps both at once.</p>')
     for label, step in [("Verify", "verify"), ("Rebuild site", "build"),
                         ("Deploy", "deploy"), ("Checkpoint", "checkpoint"),
-                        ("Commit &amp; push", "push")]:
+                        ("Commit &amp; push", "push"), ("Backup", "backup")]:
         body.append(f'<form class=inline method=post action=/ceremony>{tok()}'
                     f'<input type=hidden name=step value="{step.replace("&amp;","")}">'
                     f'<button class="act">{label}</button></form> ')
@@ -479,6 +498,7 @@ CEREMONIES = {
     "verify": [[PY, "tools/verify.py"]],
     "build": [[PY, "tools/build_site.py"], [PY, "tools/build_info.py"]],
     "checkpoint": [[PY, "tools/checkpoint.py"]],
+    "backup": [[PY, "tools/backup.py"]],
     "deploy": [[NPX, "wrangler", "pages", "deploy", "--commit-dirty=true"],
                [NPX, "wrangler", "pages", "deploy", "info-site",
                 "--project-name", "allhumans-info", "--commit-dirty=true"]],
@@ -581,8 +601,16 @@ def do_ceremony(fields):
     if not seq:
         return result("Unknown", f"no ceremony: {step}", ok=False)
     out, allok = "", True
-    for args in seq:
-        ok, o = run(args)
+    # The two Pages projects (main site, reading room) are independent
+    # uploads with nothing to hand off between them, so deploy runs them
+    # together instead of one after the other. Every other ceremony step
+    # keeps the plain sequential loop — most are single commands, and
+    # push's add/commit/push genuinely must happen in order.
+    if step == "deploy" and len(seq) > 1:
+        pairs = list(zip(seq, run_parallel(seq)))
+    else:
+        pairs = [(args, run(args)) for args in seq]
+    for args, (ok, o) in pairs:
         allok = allok and ok
         out += "$ " + " ".join(a for a in args if not a.endswith("npx.cmd")) + "\n" + o + "\n"
     # The moment a record is live is the moment its letter becomes true.
@@ -686,7 +714,8 @@ def watch(interval=600):
     seen = len(scan()["first"])
     while True:
         if have_creds:
-            run([PY, "tools/fetch_inbox.py"])     # idempotent: skips files it has
+            # --purge, always: see main() below for why.
+            run([PY, "tools/fetch_inbox.py", "--purge"])
         now = len(scan()["first"])
         if now > seen:
             k = now - seen
@@ -740,8 +769,15 @@ def main():
     # a few seconds. --no-fetch skips it when offline or in a hurry.
     if "--no-fetch" not in sys.argv and all(
             os.environ.get(k) for k in ("CF_ACCOUNT_ID", "CF_API_TOKEN")):
+        # --purge, always. OPERATIONS has always said plaintext should live
+        # on the web host only as long as it takes to collect it, and the
+        # convenience fetch added here was quietly the exception: it pulled
+        # copies down and left the originals. Nine records of testimony and
+        # email had accumulated in KV before anyone looked. Collecting a
+        # record IS what makes the remote copy safe to delete, so the two
+        # halves belong in the same command and never come apart again.
         print("[desk] fetching what is waiting…")
-        ok, out = run([PY, "tools/fetch_inbox.py"])
+        ok, out = run([PY, "tools/fetch_inbox.py", "--purge"])
         tail = [l for l in (out or "").splitlines() if l.strip()][-1:] or ["(nothing new)"]
         print(f"[desk] {tail[0]}" if ok else
               f"[desk] fetch failed, opening anyway — the desk may be incomplete:\n{out}")

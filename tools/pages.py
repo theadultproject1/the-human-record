@@ -392,6 +392,13 @@ CONSENT_JS = """
   function update(){ btn.setAttribute('aria-disabled', ready() ? 'false' : 'true'); }
   for (var i = 0; i < boxes.length; i++) boxes[i].addEventListener('change', update);
   email.addEventListener('input', update);
+  // Returning to this page (Back from Privacy, from the return page, from
+  // anywhere) can silently restore the checkboxes and the email field —
+  // browsers do this without firing change/input, so everything LOOKS
+  // filled in while the button's own computed state never got told to
+  // look again. pageshow fires on every arrival, fresh or restored, and
+  // is the one hook meant for exactly this: re-check, don't trust memory.
+  window.addEventListener('pageshow', update);
   btn.addEventListener('click', function(e){
     if (btn.getAttribute('aria-disabled') === 'true') { e.preventDefault(); return; }
     var labels = document.querySelectorAll('.checks label');
@@ -1514,7 +1521,8 @@ def render_enter():
                        'BEGIN MY FIRST TESTIMONY</a>\n</p>\n'
                        '<p class="center quiet agree">By clicking BEGIN MY FIRST '
                        'TESTIMONY you agree to the '
-                       '<a href="privacy.html">Privacy Policy</a>.</p>')
+                       '<a href="privacy.html" target="_blank" '
+                       'rel="noopener">Privacy Policy</a>.</p>')
     else:
         begin_block = ('<p class="center">\n'
                        '<a id="begin" class="aura" aria-disabled="true">'
@@ -1695,8 +1703,8 @@ def render_begin(qmeta):
     parts.append(
         '<div id="closing" class="hidden">'
         '<p>__BRAND__ is free, for every human, always. It is kept alive by '
-        'donations, and every dollar received and spent is public. A '
-        'donation buys nothing here: no marks, no priority, no tiers.</p>'
+        'donations. A donation buys nothing here: no marks, no priority, '
+        'no tiers.</p>'
         + ('<p class="center"><a class="finish" href="' + brand.DONATE_URL + '" '
            'rel="noopener">HELP KEEP THE LIGHTS ON</a></p>'
            if brand.DONATE_READY else '')

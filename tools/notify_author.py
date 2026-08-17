@@ -72,6 +72,13 @@ Don't forget, your continuity key is what grants you the possibility
 to one day write your second and final testimony. {brand} has never
 held a copy of it and cannot recover it for you.
 
+You may also invite up to 3 people. The Record grows through people
+who know one another, not through advertising. When someone comes to
+mind, bring your continuity key here and an invitation is made in
+your own browser, good for 30 days.
+
+    {invite_url}
+
 Thank you for being part of the record of what it was like to be
 human.
 
@@ -97,8 +104,15 @@ def _wrap(text, width=72):
 def letter(number):
     n = int(number)
     url = f"https://{brand.DOMAIN}/{n}"
+    # The invitation page had no way in: nothing on the site linked to it,
+    # and this letter never mentioned it, so a newly enrolled human had no
+    # way to learn they could invite anyone at all. The letter carries the
+    # door, never a key: minting is where the four affirmations are made,
+    # and a code posted in advance would record a vouch nobody gave.
+    invite_url = f"https://{brand.DOMAIN}/invite"
     return (SUBJECT.format(number=n, brand=brand.BRAND),
-            _wrap(BODY.format(number=n, brand=brand.BRAND, url=url)))
+            _wrap(BODY.format(number=n, brand=brand.BRAND, url=url,
+                              invite_url=invite_url)))
 
 
 def send(to_addr, subject, body):
