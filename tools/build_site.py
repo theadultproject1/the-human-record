@@ -233,7 +233,16 @@ LIGHTS_JS = """
   //   * the soft glow sprite (expensive) is reserved for the ~20k nearest
   //     stars; the rest are drawn as batched crisp cores, a handful of
   //     canvas paths in total — full-screen parallax stays fluid at 100k+.
-  var sizeK = Math.max(0.35, Math.min(1, Math.sqrt(20000/N)));
+  //   * and SPARSE lifts them back up while the archive is young. The law
+  //     above is capped at 1, which is right for a crowded sky and absurd
+  //     for two lights: a 1.25px core on a 1400px canvas is smaller than
+  //     dust on the screen, and the founder could not find his own
+  //     archive's first two humans. The lift ramps smoothly from 2.5x at
+  //     one light to 1x at two hundred, so it fades out on its own as
+  //     people arrive. Nobody has to remember to turn it off. Raise the
+  //     1.5 to make young skies brighter; it is the only number here.
+  var SPARSE = 1 + 1.5*Math.max(0, (200-N)/200);
+  var sizeK = Math.max(0.35, Math.min(1, Math.sqrt(20000/N))) * SPARSE;
   var GLOWN = Math.min(N, 20000);   // how many nearest stars get the glow
   function draw(){
     ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -264,7 +273,9 @@ LIGHTS_JS = """
       ctx.fill();
     }
     if (hoverI>=0){
-      ctx.beginPath(); ctx.arc(SX(hoverI), SY(hoverI), Math.max(5,4*dsz[hoverI]+2), 0, 6.2832);
+      // the ring has to clear the core, which is now much larger when the
+      // sky is nearly empty; a fixed radius would sit inside the star
+      ctx.beginPath(); ctx.arc(SX(hoverI), SY(hoverI), Math.max(5, coreR*dsz[hoverI]*2+5), 0, 6.2832);
       ctx.strokeStyle='#fff8de'; ctx.lineWidth=1.4; ctx.stroke();
     }
   }
@@ -418,6 +429,28 @@ def seal_state(entry):
     return False, "", opens.year
 
 
+def answer_attrs(entry):
+    """How to mark up an author's own words.
+
+    The page furniture is English and says so. The testimony inside it may
+    be any language on earth, and a block of French sitting inside
+    lang="en" is not a small thing: a screen reader pronounces it with
+    English rules, and a browser will not offer to translate a page it has
+    been told is already in the reader's language.
+
+    lang="" is the honest value when nobody recorded the language. Per the
+    HTML spec it means "unknown", which stops the false inheritance of
+    "en" and lets the browser detect the language from the text itself.
+
+    dir="auto" costs nothing and needs no data at all: the browser reads
+    the first strong character and lays the paragraph out accordingly, so
+    Arabic and Hebrew arrive right-to-left the day someone writes them,
+    with no further work here.
+    """
+    lang = (entry.get("language") or "").strip()
+    return f' lang="{esc(lang)}" dir="auto"'
+
+
 def render_version(v, qbyid, order, entry):
     kind_label = {"first": "First Testimony", "second": "Second Testimony",
                   "final": "Final Testimony"}[v["kind"]]
@@ -433,6 +466,7 @@ def render_version(v, qbyid, order, entry):
         return "\n".join(out)
     unsealed, how, open_year = seal_state(entry)
     answers = v.get("answers", {})
+    at = answer_attrs(entry)
     for qid in order[v["kind"]]:
         q = qbyid[qid]
         out.append('<div class="qa">')
@@ -442,7 +476,7 @@ def render_version(v, qbyid, order, entry):
             out.append('<p class="a silence">silence</p>')
         elif a["visibility"] == "sealed_until_death":
             if unsealed:
-                out.append(f'<p class="a">{esc(a["text"])} '
+                out.append(f'<p class="a"{at}>{esc(a["text"])} '
                            f'<span class="sealed">({esc(how)})</span></p>')
             elif entry.get("legacy"):
                 out.append(f'<p class="a sealed">sealed: opens with a '
@@ -451,7 +485,7 @@ def render_version(v, qbyid, order, entry):
             else:
                 out.append(f'<p class="a sealed">sealed: opens in {open_year}</p>')
         else:
-            out.append(f'<p class="a">{esc(a["text"])}</p>')
+            out.append(f'<p class="a"{at}>{esc(a["text"])}</p>')
         out.append('</div>')
     out.append(f'<p class="meta">content hash {esc(v["content_hash"])}</p>')
     return "\n".join(out)
@@ -500,7 +534,9 @@ def render_human(entry, versions, qbyid, order):
     title = f'#{rid}' + (f' · {name}' if name else '')
     body = [f'<h1><span class="number">Human #{esc(rid)}</span></h1>']
     if name:
-        body.append(f'<p>{esc(name)}</p>')
+        # A chosen name is the author's own word too, and may be in any
+        # script: 田中, مريم, Ægir. Same treatment as the answers.
+        body.append(f'<p{answer_attrs(entry)}>{esc(name)}</p>')
     meta = [f'enrolled {esc(entry["enrolled_at"][:10])}',
             f'verified to the standard of its era ({esc(entry["verification"]["era"])})']
     if entry.get("birth_era"):

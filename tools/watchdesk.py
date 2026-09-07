@@ -79,10 +79,23 @@ def email_steward(subject, body):
 def install_hint():
     task = "TheHumanRecord-Desk"
     cmd = f'"{PY}" "{ROOT / "tools" / "watchdesk.py"}" --email'
-    print("Run this once, in PowerShell, to check every 10 minutes:")
+    print("Run this once, in PowerShell, to check every hour:")
     print()
-    print(f'  schtasks /Create /TN "{task}" /SC MINUTE /MO 10 /F \\')
+    print(f'  schtasks /Create /TN "{task}" /SC HOURLY /F \\')
     print(f'    /TR \'{cmd}\'')
+    print()
+    print("Then FIX THE LAPTOP DEFAULTS, or it will not run unplugged:")
+    print()
+    print(f'  $s = New-ScheduledTaskSettingsSet -StartWhenAvailable '
+          f'-AllowStartIfOnBatteries \\')
+    print(f'         -DontStopIfGoingOnBatteries '
+          f'-ExecutionTimeLimit (New-TimeSpan -Minutes 10)')
+    print(f'  Set-ScheduledTask -TaskName "{task}" -Settings $s')
+    print()
+    print("Task Scheduler creates tasks with DisallowStartIfOnBatteries=True,")
+    print("so on a laptop the watcher is silently deaf whenever it is")
+    print("unplugged, and skipped runs are never made up. Those two lines are")
+    print("not optional on a portable machine.")
     print()
     print("It runs whether or not a terminal is open, and survives a reboot.")
     print(f'To stop it later:  schtasks /Delete /TN "{task}" /F')
@@ -103,7 +116,7 @@ def main():
         return 2
 
     if all(os.environ.get(k) for k in ("CF_ACCOUNT_ID", "CF_API_TOKEN")):
-        # --purge, always: this runs every ten minutes unattended, so it is
+        # --purge, always: this runs unattended every hour, so it is
         # the single biggest reason plaintext would pile up on the web host.
         # Having the local copy is what makes deleting the remote one safe.
         subprocess.run([PY, str(ROOT / "tools" / "fetch_inbox.py"), "--purge"],

@@ -94,12 +94,19 @@ def do_check():
     if newest is None:
         print(f"NO BACKUP EXISTS, and the archive holds {humans} human(s).")
         return 1
-    tars = sorted(newest.glob("*-worktree-*.tar.gz"))
+    tars = list(newest.glob("*-worktree-*.tar.gz"))
     if not tars:
         print(f"newest backup {newest.name} has no worktree archive — "
               f"it holds the machinery but not the testimonies.")
         return 1
-    latest = tars[-1]
+    # By TIME, never by name. Archives are named by commit sha, so running
+    # backup.py twice in a day leaves several in one dated folder and
+    # alphabetical order is meaningless: on 2026-09-01 a fresh backup
+    # holding four humans sorted BEHIND an older one holding two, and this
+    # check reported the archive unbacked-up seconds after backing it up.
+    # A checker that cries wolf is worse than no checker, because the next
+    # real warning gets waved away.
+    latest = max(tars, key=lambda p: p.stat().st_mtime)
     inside = set()
     with tarfile.open(latest, "r:gz") as t:
         for m in t.getnames():

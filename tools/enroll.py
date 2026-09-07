@@ -126,6 +126,18 @@ def main():
     founder_vouch = "--founder-vouch" in args
     if founder_vouch:
         args.remove("--founder-vouch")
+    # The language the author actually wrote in, as a BCP-47 tag ("fr",
+    # "ja", "pt-BR"). Recorded so the site can mark their words correctly
+    # instead of declaring every testimony English: a screen reader
+    # otherwise reads French with English pronunciation, and a browser
+    # will not offer to translate a page it believes is already in the
+    # reader's language. Optional, and left unset rather than guessed.
+    language = flag(args, "--language")
+    if language:
+        language = language.strip().lower()
+        if not re.fullmatch(r"[a-z]{2,3}(-[a-z0-9]{2,8})*", language):
+            sys.exit(f"--language: '{language}' is not a language tag. "
+                     f"Use a BCP-47 tag such as fr, ja, ar, pt-br.")
     if len(args) != 1:
         print(__doc__)
         sys.exit(2)
@@ -308,9 +320,21 @@ def main():
             "key_hash": key_hash,
         },
     }
-    for opt in ("chosen_name", "birth_era", "birth_place"):
+    for opt in ("chosen_name", "birth_era", "birth_place", "language"):
         if sitting.get(opt):
             entry[opt] = sitting[opt]
+    # Whatever a browser sent is checked here, not trusted. The worker
+    # guards against floods, not shapes, so this is where a language tag
+    # either proves itself a language tag or is dropped with a word said.
+    sent = str(entry.get("language", "")).strip().lower()
+    if sent and not re.fullmatch(r"[a-z]{2,3}(-[a-z0-9]{2,8})*", sent):
+        print(f"note: ignoring an unusable language value ({sent!r}); "
+              f"the record will say the language is unknown.")
+        entry.pop("language", None)
+    elif sent:
+        entry["language"] = sent
+    if language:                      # the flag wins over anything submitted
+        entry["language"] = language
 
     # A sealed name is a sealed name. chosen_name is the PUBLIC display
     # name, and it carries the same text the author typed into q_name; if

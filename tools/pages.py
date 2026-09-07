@@ -530,6 +530,18 @@ WRITE_JS_TEMPLATE = """
     });
   }
 
+  // Preselect the browser's language, as a courtesy and nothing more: the
+  // author can change it, and the archive records what they chose, never
+  // what the browser assumed.
+  (function(){
+    var sel = document.getElementById('lang_tag');
+    if (!sel) return;
+    var want = (navigator.language || '').toLowerCase().split('-')[0];
+    for (var i = 0; i < sel.options.length; i++){
+      if (sel.options[i].value === want){ sel.selectedIndex = i; break; }
+    }
+  })();
+
   var areas = document.querySelectorAll('textarea');
   for (var i = 0; i < areas.length; i++) (function(ta){
     var cap = ta.id === 'q_name' ? NAME_CAP : CAP;
@@ -713,8 +725,14 @@ WRITE_JS_TEMPLATE = """
     // still opens one day, but nothing here can be printed on a heading
     // by mistake. The seal is honoured before the words are even sent.
     var nameSealed = document.getElementById('q_name_seal').checked;
+    // "other" and "not saying" both travel as nothing: the record then
+    // says the language is unknown, which is true, rather than naming one.
+    var langSel = document.getElementById('lang_tag');
+    var lang = langSel ? langSel.value : '';
+    if (lang === 'other') lang = '';
     return { sitting: {
       chosen_name: nameSealed ? undefined : name,
+      language: lang || undefined,
       verification: { tier: 0, era: 'founding era, verified email' },
       answers: answers
     }};
@@ -1594,7 +1612,10 @@ def render_begin(qmeta):
                         ' <span class="plainnote">%s</span>' % mark if mark else ''))
         if q.get("note"):
             parts.append('<p class="note">%s</p>' % html.escape(q["note"]))
-        parts.append('<textarea id="%s" maxlength="%d"></textarea>' % (qid, qcap))
+        # dir=auto so an author writing Arabic, Hebrew or Persian gets a
+        # right-to-left box the moment they type, with nothing configured.
+        parts.append('<textarea id="%s" maxlength="%d" dir="auto"></textarea>'
+                     % (qid, qcap))
         parts.append('<div class="under"><label class="seal">'
                      '<input type="checkbox" id="%s_seal" class="sealbox"> '
                      'seal this answer until my death'
@@ -1621,6 +1642,29 @@ def render_begin(qmeta):
         'enrollment.<br>'
         '<em>Some are opened by those we trust. '
         'The rest are opened by time itself.</em></div>')
+    # Asked, never guessed. Language detection is a library the archive will
+    # not carry, and a wrong guess is worse than no answer: it would tell a
+    # screen reader to pronounce someone's words in the wrong tongue. The
+    # browser's own setting is only the default; the author decides.
+    parts.append(
+        '<div class="q" id="langq">'
+        '<p class="prompt">I AM WRITING IN '
+        '<span class="plainnote">(so your words are read and spoken '
+        'correctly)</span></p>'
+        '<select id="lang_tag">'
+        + "".join('<option value="%s">%s</option>' % (t, n) for t, n in [
+            ("", "not saying"), ("en", "English"), ("fr", "Français"),
+            ("es", "Español"), ("pt", "Português"), ("de", "Deutsch"),
+            ("it", "Italiano"), ("nl", "Nederlands"), ("pl", "Polski"),
+            ("ru", "Русский"), ("uk", "Українська"), ("tr", "Türkçe"),
+            ("ar", "العربية"), ("he", "עברית"), ("fa", "فارسی"),
+            ("hi", "हिन्दी"), ("bn", "বাংলা"), ("ur", "اردو"),
+            ("zh", "中文"), ("ja", "日本語"), ("ko", "한국어"),
+            ("vi", "Tiếng Việt"), ("th", "ไทย"), ("id", "Bahasa Indonesia"),
+            ("sw", "Kiswahili"), ("other", "another language"),
+        ]) +
+        '</select>'
+        '</div>')
     parts.append(
         '<div class="q" id="vouchq">'
         '<p class="prompt">MY INVITATION '
