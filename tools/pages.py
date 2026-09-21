@@ -1649,8 +1649,8 @@ def render_begin(qmeta):
     parts.append(
         '<div class="q" id="langq">'
         '<p class="prompt">I AM WRITING IN '
-        '<span class="plainnote">(so your words are read and spoken '
-        'correctly)</span></p>'
+        '<span class="plainnote">(it helps everyone on earth including the '
+        'ones with a disability to read your words)</span></p>'
         '<select id="lang_tag">'
         + "".join('<option value="%s">%s</option>' % (t, n) for t, n in [
             ("", "not saying"), ("en", "English"), ("fr", "Français"),
@@ -1669,9 +1669,17 @@ def render_begin(qmeta):
         '<div class="q" id="vouchq">'
         '<p class="prompt">MY INVITATION '
         '<span class="plainnote">(optional)</span></p>'
+        # Not the place to explain review. A person does read every
+        # testimony, and the archive says so plainly where it matters: on
+        # the screen after submitting (where it is reassurance, paired
+        # with "no testimony is ever refused for being dark") and in the
+        # seal explanation (where someone deciding to seal their name
+        # must know a steward will read it). Here it answered a question
+        # nobody asked, beside a technical field about codes, and read as
+        # a warning. So this line says what happens, not who does it.
         '<p class="note">If a human already in The Record invited you, '
-        'enter the invitation they gave you. If not, leave this empty; a '
-        'person will verify your submission another way.</p>'
+        'enter the invitation they gave you. If not, leave this empty; '
+        'your submission will be reviewed a different way.</p>'
         '<input type="text" id="vouch_code" maxlength="18" '
         'placeholder="vh1-xxxx-xxxx-xxxx" autocomplete="off" spellcheck="false">'
         '</div>')

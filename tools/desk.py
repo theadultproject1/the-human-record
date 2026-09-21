@@ -176,8 +176,30 @@ def card(path):
     name = sitting.get("chosen_name")
     who = esc(name) if name else '<span class="silence">anonymous</span>'
     problems = enroll.validate(sitting, qmeta, qbyid)
-    badge = ('<span class="badge ok">would enroll cleanly</span>' if not problems
-             else f'<span class="badge no">would NOT enroll · {len(problems)} problem(s)</span>')
+    # Which door this arrival came through. An envelope carrying vouched_by
+    # means a human already in the Record spent an invitation on them and
+    # the worker checked the code; that is a different act from the
+    # founder's own word, and the two must never be one button.
+    env = enroll.read_envelope(path) or {}
+    env_vouch = str(env.get("vouched_by") or "").strip()
+    if not (env_vouch.isdigit() and env.get("vouch_gate")):
+        env_vouch = ""
+    tier0_only = bool(problems) and all("Tier 0" in p for p in problems)
+    invited = tier0_only and bool(env_vouch)
+
+    # Every browser submits Tier 0, so an invited arrival ALWAYS trips the
+    # tier complaint, and the badge used to shout "would NOT enroll" directly
+    # above a button that enrolls it. The invitation is the answer to that
+    # complaint, so say so once, here, instead of raising an objection the
+    # next line already settles.
+    if invited:
+        badge = (f'<span class="badge ok">would enroll at Tier 2 · '
+                 f'invited by #{esc(env_vouch)}</span>')
+    elif not problems:
+        badge = '<span class="badge ok">would enroll cleanly</span>'
+    else:
+        badge = (f'<span class="badge no">would NOT enroll · '
+                 f'{len(problems)} problem(s)</span>')
     ver = sitting.get("verification") or {}
 
     out = ['<div class="card">',
@@ -186,7 +208,13 @@ def card(path):
            f'<div>{badge}</div>',
            f'<p class="meta">verification: tier {esc(ver.get("tier", "—"))} · '
            f'{esc(ver.get("era", "—"))}</p>']
-    if problems:
+    if invited:
+        out.append(f'<p class="meta">Tier 0 is what every browser sends. This one '
+                   f'arrived with an invitation minted by #{esc(env_vouch)}, which the '
+                   f'worker checked at submission: a real, unused code made by someone '
+                   f'holding that record\'s continuity key. Enrolling on it writes '
+                   f'Tier 2 and records the edge.</p>')
+    elif problems:
         out.append('<ul class="meta">' +
                    "".join(f'<li class="err">{esc(p)}</li>' for p in problems) + '</ul>')
 
@@ -228,11 +256,18 @@ def card(path):
         # ONLY complaint, offer the hand-vouch; any other problem still
         # hides the button, because those are faults rather than a
         # standard the founder can vouch past.
-        tier0_only = bool(problems) and all("Tier 0" in p for p in problems)
+        # tier0_only, env_vouch and invited are decided once, above, where
+        # the badge is written: one reading of the envelope, one answer.
         if not problems:
             out.append(f'<form class=inline method=post action=/enroll>{tok()}'
                        f'<input type=hidden name=file value="{f}">'
                        f'<button class="act enroll">ENROLL — assign the number</button></form>')
+        elif invited:
+            out.append(f'<form class=inline method=post action=/enroll>{tok()}'
+                       f'<input type=hidden name=file value="{f}">'
+                       f'<input type=hidden name=vouched_by value="{esc(env_vouch)}">'
+                       f'<button class="act enroll">ENROLL &mdash; INVITED BY '
+                       f'#{esc(env_vouch)}</button></form>')
         elif tier0_only:
             out.append(f'<form class=inline method=post action=/enroll>{tok()}'
                        f'<input type=hidden name=file value="{f}">'
@@ -369,7 +404,31 @@ def do_enroll(fields):
         extra = [note,
                  f"<p>Enrolling will spend {where} and show the continuity key "
                  f"once.</p>"]
-        if tier < 1:
+        peer = bool(vb) and bool((env or {}).get("vouch_gate")) and str(vb).isdigit()
+        if tier < 1 and peer:
+            # Invited, not hand-vouched. The worker proved the invitation
+            # was real and unused before this was ever stored, so the
+            # steward is confirming someone else's word, not lending
+            # their own. Two different acts, two different buttons, two
+            # different sentences on the record forever.
+            extra.append(
+                f"<p>This sitting arrives <strong>Tier 0</strong>, as every browser "
+                f"submission does, but it carries an <strong>invitation minted by "
+                f"#{esc(vb)}</strong> which the worker verified at submission: real, "
+                f"unused, and made by someone holding a continuity key.</p>"
+                f"<p>Enrolling on it admits the record at <strong>Tier 2</strong> and "
+                f"records the edge privately, number to number. The record will read "
+                f"<em>“{esc(enroll.PEER_ERA)}”</em> forever. It names no one: POLICY "
+                f"keeps the vouch graph private.</p>"
+                f"<p>This is not your hand-vouch. #{esc(vb)} spent one of their three "
+                f"invitations this year on this person.</p>"
+                f"<pre class='out'>{esc(cmd)}</pre>"
+                f"<form method=post action=/enroll>{tok()}"
+                f"<input type=hidden name=file value=\"{esc(name)}\">"
+                f"<input type=hidden name=confirm value=yes>"
+                f"<button class='act enroll'>CONFIRM — enroll as invited by "
+                f"#{esc(vb)}</button></form> <a class='back' href='/'>cancel</a>")
+        elif tier < 1:
             extra.append(
                 "<p class='warn'>This sitting is <strong>Tier 0</strong> (verified "
                 "email). POLICY grants no number for that alone, so plain "

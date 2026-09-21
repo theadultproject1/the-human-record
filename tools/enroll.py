@@ -51,6 +51,13 @@ import ahlib
 import anchors
 
 
+# What a peer-invited record says about itself, forever. It names the
+# standard and not the voucher: POLICY keeps the vouch graph private, so
+# a page shows only "vouched, to the standard of its era". One constant,
+# one place, because it is written into records that are never edited.
+PEER_ERA = "founding era — invited by a human in the Record"
+
+
 def load_questionnaire():
     q = json.loads((ahlib.ROOT / "questions" / "v1.json").read_text(encoding="utf-8"))
     return q, {item["id"]: item for item in q["questions"]}
@@ -173,6 +180,26 @@ def main():
         print("founder's own attestation. The record will say so, forever:")
         print('  verification: "founding era — founder vouch"')
         print("No vouch edge is recorded; there is no voucher's number to bind.")
+
+    # The other door, which had no handle. A peer invitation is Tier 2 by
+    # POLICY, but --vouched-by only recorded the EDGE; nothing raised the
+    # tier, and validate() refuses Tier 0 further down. Every browser
+    # submits Tier 0, so the self-serve path built on 2026-07-12 could
+    # never actually complete — first noticed on 2026-09-18, when the
+    # first person invited by another human arrived at the desk.
+    #
+    # Raising it here is honest: the worker already proved, before this
+    # submission was ever stored, that the invitation was real, unused,
+    # and minted by someone who held a continuity key. The steward is
+    # confirming that proof, not inventing one.
+    if vouched_by:
+        was = (sitting.get("verification") or {}).get("tier")
+        sitting["verification"] = {"tier": 2, "era": PEER_ERA}
+        print(f"peer invitation: admitting a Tier {was} sitting as Tier 2 on")
+        print(f"#{anchors.valid_rid(vouched_by)}'s invitation, which the worker "
+              f"verified at submission.")
+        print(f'  verification: "{PEER_ERA}"')
+        print("The edge is recorded privately, number to number, below.")
 
     qmeta, qbyid = load_questionnaire()
     problems = validate(sitting, qmeta, qbyid)

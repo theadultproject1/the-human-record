@@ -250,6 +250,65 @@ else
 fi
 rm -rf "$FB"
 
+echo "12) a REAL peer-invited submission: Tier 0 in, Tier 2 out, edge recorded"
+# Test 10 above builds its candidate with "tier": 2 already written in, so
+# it proved the edge was recorded but never touched the tier. Every real
+# browser submits Tier 0, so the self-serve path built on 2026-07-12 was
+# refused by validate() every time and nobody knew until 2026-09-18, when
+# the first person invited by another human reached the desk. This test
+# uses what a browser actually sends.
+PV="$(mktemp -d "${TMPDIR:-/tmp}/ah_peervouch.XXXXXX")"
+cp -r "$ROOT/." "$PV/" 2>/dev/null
+rm -rf "$PV/.git" "$PV/.wrangler"
+(
+  cd "$PV" || exit 1
+  rm -rf registry log && mkdir -p registry log
+  rm -rf checkpoints custody
+  export AH_CUSTODY_DIR="$PV/custody-test"
+  unset AH_ANCHOR_PEPPER_FILE 2>/dev/null || true
+  "$PY" tools/anchors.py init >/dev/null 2>&1
+  "$PY" - <<'PYEOF'
+import sys; sys.path.insert(0, "tools")
+import ahlib
+docs = {rel: ahlib.file_sha256(ahlib.ROOT / rel) for rel in (
+    "CONSTITUTION.md", "questions/v1.json", "questions/v1.md",
+    "schema/CANONICAL.md", "schema/entry.v1.json", "schema/event.v1.json",
+    "schema/version.v1.json")}
+ahlib.append_event("GENESIS", {"documents": docs, "statement": "test"})
+PYEOF
+  cat > voucher0.json <<'JSON'
+{ "chosen_name": "Voucher", "verification": {"tier": 0, "era": "founding era, verified email"},
+  "answers": {
+    "q_name":  {"text": "Voucher", "visibility": "public"},
+    "q_smile": {"text": "A quiet morning with strong coffee.", "visibility": "public"},
+    "q_hope":  {"text": "That kindness outlives all of us.", "visibility": "public"} } }
+JSON
+  cat > invited0.json <<'JSON'
+{ "chosen_name": "Invited Person", "verification": {"tier": 0, "era": "founding era, verified email"},
+  "answers": {
+    "q_name":  {"text": "Invited Person", "visibility": "public"},
+    "q_smile": {"text": "Rain on a tin roof late at night.", "visibility": "public"},
+    "q_hope":  {"text": "A gentler century than the last one.", "visibility": "public"} } }
+JSON
+  "$PY" tools/enroll.py voucher0.json --email v0@example.org --founder-vouch >/dev/null 2>&1
+  "$PY" tools/enroll.py invited0.json --email i0@example.org --vouched-by 000000002 2>&1
+  echo "--- what the invited record says ---"
+  cat registry/000000003/entry.json 2>/dev/null
+  echo "--- verify ---"
+  "$PY" tools/verify.py 2>&1 | tail -1
+) > "$PV/peer.out" 2>&1
+if grep -qE "enrolled: (Registry )?#000000003" "$PV/peer.out" \
+   && grep -q "invited by a human in the Record" "$PV/peer.out" \
+   && grep -q '"tier": 2' "$PV/peer.out" \
+   && grep -q "vouch edge recorded privately: #000000002 -> #000000003" "$PV/peer.out" \
+   && ! grep -q "founder vouch" "$PV/peer.out" \
+   && grep -q "^OK" "$PV/peer.out"; then
+  ok "a browser's Tier 0 + a real invitation enrolls at Tier 2, edge recorded, not a founder vouch"
+else
+  bad "peer invitation path wrong:"; sed 's/^/    /' "$PV/peer.out" | tail -18
+fi
+rm -rf "$PV"
+
 echo
 echo "vouch: $PASS passed, $FAIL failed"
 rm -rf "$ROOT/custody-test-vouch" 2>/dev/null
