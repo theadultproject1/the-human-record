@@ -122,6 +122,15 @@ rather than altering the sealed text.
   apparent full names for a human to check; this is a moderation
   judgment, never an automatic block.
 
+  The first-name-only rule protects living private individuals from being
+  identified in another person's testimony. It does not apply to deities,
+  religious or spiritual figures, prophets, saints, or historical and public
+  figures, who may be named in full, as any person naturally would in
+  expressing their belief or recounting their life. This holds equally for the
+  figures of every faith and tradition, without exception. The separate rule
+  against accusations toward named living third parties still applies in all
+  cases.
+
 ## Crisis of the author (crisis-response protocol)
 
 Two of the shared questions — `q_hardest` ("the hardest thing I have
@@ -389,6 +398,9 @@ no machinery can do.
 
 ## Change log
 
+- 2026-10-24 — Clarified that the first-name-only rule covers living
+  private individuals only; deities, religious figures, and
+  historical/public figures may be named in full, equally for every faith.
 - 2026-07-17 — Privacy Policy published (PRIVACY.md, rendered on both
   sites) and joined to consent by the agreement line under the begin
   button ("By clicking BEGIN MY FIRST TESTIMONY you agree to the
