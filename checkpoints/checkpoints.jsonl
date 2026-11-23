@@ -9,3 +9,4 @@
 {"anchors":[{"kind":"git"}],"checkpoint_at":"2026-10-04T17:06:39Z","log_events":19,"log_tip_hash":"c9e890d1c2825e42be8f7f194749a9ba80255fe6944fd6adc0bd64c01b6d308d","schema":"checkpoint.v1"}
 {"anchors":[{"kind":"git"}],"checkpoint_at":"2026-10-07T16:51:42Z","log_events":21,"log_tip_hash":"f85f26be87154eba8297a3d3b1aaaffc09af78a04603a3369a9b778c042116ff","schema":"checkpoint.v1"}
 {"anchors":[{"kind":"git"}],"checkpoint_at":"2026-10-24T17:54:09Z","log_events":23,"log_tip_hash":"f0e6ff2b939c503595a4d533b016dfc8543833c03999f960d2a5a6e81d0878cc","schema":"checkpoint.v1"}
+{"anchors":[{"kind":"git"},{"kind":"opentimestamps","proof":"2026-11-21-61128d3d645c.tip.ots"}],"checkpoint_at":"2026-11-21T06:52:18Z","log_events":25,"log_tip_hash":"61128d3d645c698312e8adc8e821af10827fd1d72747169f8e73ad7966c81722","schema":"checkpoint.v1"}

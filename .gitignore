@@ -24,6 +24,12 @@ __pycache__/
 inbox/*
 !inbox/README.md
 
+# Letters written to one named person (tools/send_note.py). Correspondence,
+# not record: it names an individual and the reason they were written to,
+# and git history cannot be un-written. Compose here, send, keep the copy
+# in custody if it is worth keeping at all.
+letters/
+
 # wrangler's local cache — deployment plumbing, never part of the record
 .wrangler/
 
